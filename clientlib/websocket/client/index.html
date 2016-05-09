@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Flic Websocket example</title>
+<script type="text/javascript" src="http://code.jquery.com/jquery-2.2.3.min.js"></script>
+<script type="text/javascript" src="fliclib.js"></script>
+
+<script type="text/javascript">
+
+var client = new FlicClient("ws://localhost:5553");
+
+client.onReady = function() {
+	$("#flicServerState").text("Connected");
+	client.getInfo(function(info) {
+		info.bdAddrOfVerifiedButtons.forEach(function(bdAddr) {
+			onGotButton(bdAddr);
+		});
+		if (info.currentlyNoSpaceForNewConnection) {
+			$("#maxConnectionsWarning").show();
+		}
+		$("#bluetoothControllerState").text(info.bluetoothControllerState);
+	});
+};
+
+client.onClose = function() {
+	$("#flicServerState").text("Closed");
+};
+
+client.onNewVerifiedButton = function(bdAddr) {
+	onGotButton(bdAddr);
+};
+
+client.onNoSpaceForNewConnection = function(maxConcurrentlyConnectedButtons) {
+	$("#maxConnectionsWarning").show();
+};
+
+client.onGotSpaceForNewConnection = function(maxConcurrentlyConnectedButtons) {
+	$("#maxConnectionsWarning").hide();
+};
+
+client.onBluetoothControllerStateChange = function(state) {
+	$("#bluetoothControllerState").text(state);
+};
+
+function onGotButton(bdAddr) {
+	var node = $("<tr><td class='bdaddr'></td><td class='status'></td><td class='pressed'></td></tr>");
+	node.find(".bdaddr").text(bdAddr);
+	$("#flics").append(node);
+	
+	var cc = new FlicConnectionChannel(bdAddr, {
+		onButtonUpOrDown: function(clickType, wasQueued, timeDiff) {
+			console.log(bdAddr + ": " + clickType);
+			node.find(".pressed").text(clickType == "ButtonDown" ? "Pressed" : "");
+		},
+		onCreateResponse: function(error, connectionStatus) {
+			node.find(".status").text(error == "NoError" ? connectionStatus : error);
+		},
+		onConnectionStatusChanged: function(connectionStatus, disconnectReason) {
+			node.find(".status").text(connectionStatus);
+		}
+	});
+	client.addConnectionChannel(cc);
+}
+
+function startScanWizard() {
+	$("#addBtn").hide();
+	$("#cancelAddBtn").show();
+	
+	$("#addBtnResult").text("Welcome to the add new button wizard. Press your Flic button to add it.");
+	
+	var finished = false;
+	function success(cc, bdAddr) {
+		client.removeConnectionChannel(cc);
+		$("#addBtnResult").text("Button " + bdAddr + " successfully added!");
+		done();
+	}
+	function failed(msg) {
+		$("#addBtnResult").text("Scan Wizard Failed: " + msg);
+		done();
+	}
+	function done() {
+		finished = true;
+		$("#addBtn").show();
+		$("#cancelAddBtn").hide();
+	}
+	var cc = null;
+	var scanner = new FlicScanner({
+		onAdvertisementPacket: function(bdAddr, name, rssi, isPrivate, alreadyVerified) {
+			if (alreadyVerified) {
+				return;
+			}
+			if (isPrivate) {
+				$("#addBtnResult").text("Your button is private. Hold down for 7 seconds to make it public.");
+				return;
+			}
+			client.removeScanner(scanner);
+			
+			cc = new FlicConnectionChannel(bdAddr, {
+				onCreateResponse: function(error, connectionStatus) {
+					if (finished) {
+						return;
+					}
+					if (connectionStatus == "Ready") {
+						// Got verified by someone else between scan result and this event
+						success(cc, bdAddr);
+					} else if (error != "NoError") {
+						failed("Too many pending connections");
+					} else {
+						$("#addBtnResult").text("Found a public button. Now connecting...");
+						setTimeout(function() {
+							client.removeConnectionChannel(cc);
+						}, 30 * 1000);
+					}
+				},
+				onConnectionStatusChanged: function(connectionStatus, disconnectReason) {
+					if (!finished && connectionStatus == "Ready") {
+						success(cc, bdAddr);
+					}
+				},
+				onRemoved: function(removedReason) {
+					if (finished) {
+						return;
+					}
+					if (removedReason == "RemovedByThisClient") {
+						failed("Timed out");
+					} else {
+						failed(removedReason);
+					}
+				}
+			});
+			client.addConnectionChannel(cc);
+		}
+	});
+	client.addScanner(scanner);
+	window.stopScanWizard = function() {
+		client.removeScanner(scanner);
+		if (cc) {
+			client.removeConnectionChannel(cc);
+		}
+		$("#addBtnResult").text("");
+		done();
+	};
+}
+
+</script>
+</head>
+<body>
+
+Flic server: <span id="flicServerState">Connecting</span><br />
+Bluetooth controller: <span id="bluetoothControllerState"></span><br />
+
+<table width="500" border="1">
+	<thead>
+		<tr>
+			<th>BdAddr</th>
+			<th>Status</th>
+			<th>Pressed</th>
+		</tr>
+	</thead>
+<tbody id="flics">
+</tbody>
+</table>
+
+<br />
+<input type="button" value="Add new button" onclick="startScanWizard()" id="addBtn" />
+<input type="button" value="Cancel add new button" onclick="stopScanWizard()" id="cancelAddBtn" style="display:none" />
+<br />
+<br />
+<span id="addBtnResult"></span>
+<br />
+<br />
+<span id="maxConnectionsWarning" style="color:red;display:none">Maximum number of connected buttons reached!</span>
+
+</body>
+</html>
