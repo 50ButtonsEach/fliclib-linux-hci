@@ -12,6 +12,7 @@ This library is built on top of the HCI_CHANNEL_USER capability of the Linux ker
 ### What's included
 * `flicd` - This is the central daemon that manages all buttons. Run it with ./flicd -f flic.sqlite3
 * `clientlib/java` - A library that implements the protocol that should be very easy to use. Two example programs are included as well. Open it up in IntelliJ.
+* `clientlib/python` - A library for python 3.3 or higher, very similar to the Java library. Some example programs included.
 * `clientlib/websocket` - A websocket proxy and a demo client in html/javascript which you can use to scan and connect buttons.
 * `simpleclient` - A simple command line client with source code that can be used to test the protocol.
 * `client_protocol_packets.h` - C/C++ structs for all packets that can be included in a C/C++ program.
@@ -49,6 +50,34 @@ Now start the daemon in one terminal by executing `./flicd -f flic.sqlite3`. Add
 In another terminal open the simpleclient directory, compile it with make and run with `./simpleclient localhost`. You will be shown the available commands. Type `startScan` and press enter to start scanning for buttons. Then press your flic button (and make sure it is disconnected to any other devices such as a smartphone) and you should see it appear. Type `stopScan` and press enter to stop scanning (it's ok if output text are interleaved with what you type). Hold your Flic button for 7 seconds to make it public, and make sure that it glows red. Then enter the command `connect <BDADDR> <id>` where `<BDADDR>` is the address that appeared during scan. For `<id>`, put any integer that will be used later to refer to this connection. The button should now connect and you will see click events appear. Type `disconnect <id>` to later disconnect.
 
 You can also try out the websocket example. Run both the daemon and the websocket proxy. Then open up the client html page.
+
+### Usage of flicd
+```
+Usage: ./flicd -f sqlite_db_file.db [options]
+
+
+    --help          Prints this text and exits.
+
+-f  --db-file       Sqlite3 db file to use. In this file bonding information is stored for verified Flic buttons.
+                    If the file doesn't exist, it is created.
+                    
+-b  --my-bdaddr     Static random bdaddr to use for the bluetooth controller.
+                    Use this optional argument to assign a custom bdaddr instead of using the one burnt-in into the controller.
+                    It's useful for scenarios where you want to use previously set up Flic bonding information
+                    with a different bluetooth controller. Then simply use the same bdaddr for both controllers.
+                    Must be of the form xx:xx:xx:xx:xx:xx (6 hexadecimal numbers) where the first byte is between 0xc0 and 0xff.
+                    
+-s  --server-addr   Server IP address to bind to. 127.0.0.1 is the default which means only clients on this computer
+                    can connect to the server. Use 0.0.0.0 if you want the server to be accessible from the outside.
+                    
+-p  --server-port   Server port to bind to. The default is 5551.
+                    
+-h  --hci-dev       HCI device to use. The default is hci0.
+
+-d  --daemon        Run flicd as a Linux daemon.
+
+-l  --log-file      Specify a log file name instead of using stderr.
+```
 
 ## Troubleshooting
 To see the available HCI available bluetooth controllers, run the `hciconfig` command. If it prints nothing, Linux can't find it. Run `dmesg` to see if there are any kernel error messages.
