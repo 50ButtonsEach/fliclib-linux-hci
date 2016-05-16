@@ -14,6 +14,7 @@ This library is built on top of the HCI_CHANNEL_USER capability of the Linux ker
 * `clientlib/java` - A library that implements the protocol that should be very easy to use. Two example programs are included as well. Open it up in IntelliJ.
 * `clientlib/python` - A library for python 3.3 or higher, very similar to the Java library. Some example programs included.
 * `clientlib/websocket` - A websocket proxy and a demo client in html/javascript which you can use to scan and connect buttons.
+* `clientlib/nodejs` - A library for nodejs and examples.
 * `simpleclient` - A simple command line client with source code that can be used to test the protocol.
 * `client_protocol_packets.h` - C/C++ structs for all packets that can be included in a C/C++ program.
 
