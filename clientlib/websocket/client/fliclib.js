@@ -204,7 +204,8 @@ var FlicRawWebsocketClient = function(wsAddress) {
 			case FlicEventOpcodes.ConnectionStatusChanged: {
 				var evt = {
 					connId: readInt32(),
-					connectionStatus: readEnum("ConnectionStatus")
+					connectionStatus: readEnum("ConnectionStatus"),
+					disconnectReason: readEnum("DisconnectReason")
 				};
 				me.onEvent(opcode, evt);
 				break;
@@ -375,9 +376,12 @@ var FlicConnectionChannel = (function() {
 		
 		var id = counter++;
 		
+		var client = null;
+		
 		this._getId = function() { return id; };
 		
 		this._attach = function(rawClient) {
+			client = rawClient;
 			rawClient.sendCommand(FlicCommandOpcodes.CreateConnectionChannel, {
 				connId: id,
 				bdAddr: bdAddr,
@@ -389,6 +393,9 @@ var FlicConnectionChannel = (function() {
 			rawClient.sendCommand(FlicCommandOpcodes.RemoveConnectionChannel, {
 				connId: id
 			});
+		};
+		this._detached = function() {
+			client = null;
 		};
 		this._onEvent = function(opcode, event) {
 			switch (opcode) {
@@ -415,6 +422,38 @@ var FlicConnectionChannel = (function() {
 					break;
 			}
 		};
+		
+		Object.defineProperty(this, "latencyMode", {
+			get: function() {
+				return latencyMode;
+			},
+			set: function(value) {
+				latencyMode = value;
+				if (client != null) {
+					client.sendCommand(FlicCommandOpcodes.ChangeModeParameters, {
+						connId: id,
+						latencyMode: latencyMode,
+						autoDisconnectTime: autoDisconnectTime
+					});
+				}
+			}
+		});
+		
+		Object.defineProperty(this, "autoDisconnectTime", {
+			get: function() {
+				return autoDisconnectTime;
+			},
+			set: function(value) {
+				autoDisconnectTime = value;
+				if (client != null) {
+					client.sendCommand(FlicCommandOpcodes.ChangeModeParameters, {
+						connId: id,
+						latencyMode: latencyMode,
+						autoDisconnectTime: autoDisconnectTime
+					});
+				}
+			}
+		});
 	};
 })();
 
@@ -496,6 +535,7 @@ var FlicClient = function(wsAddress) {
 					var cc = connectionChannels[event.connId];
 					if ((opcode == FlicEventOpcodes.CreateConnectionChannel && event.error != "NoError") || opcode == FlicEventOpcodes.ConnectionChannelRemoved) {
 						delete connectionChannels[event.connId];
+						cc._detached();
 					}
 					cc._onEvent(opcode, event);
 				}
@@ -523,7 +563,7 @@ var FlicClient = function(wsAddress) {
 				break;
 			}
 		}
-	}
+	};
 	
 	this.addScanner = function(flicScanner) {
 		if (flicScanner._getId() in scanners) {
@@ -538,7 +578,7 @@ var FlicClient = function(wsAddress) {
 		}
 		delete scanners[flicScanner._getId()];
 		flicScanner._detach(rawClient);
-	}
+	};
 	
 	this.addConnectionChannel = function(connectionChannel) {
 		if (connectionChannel._getId() in connectionChannels) {
@@ -546,18 +586,18 @@ var FlicClient = function(wsAddress) {
 		}
 		connectionChannels[connectionChannel._getId()] = connectionChannel;
 		connectionChannel._attach(rawClient);
-	}
+	};
 	this.removeConnectionChannel = function(connectionChannel) {
 		if (!(connectionChannel._getId() in connectionChannels)) {
 			return;
 		}
 		connectionChannel._detach(rawClient);
-	}
+	};
 	
 	this.getInfo = function(callback) {
 		getInfoResponseCallbackQueue.push(callback);
 		rawClient.sendCommand(FlicCommandOpcodes.GetInfo, {});
-	}
+	};
 	
 	this.onReady = function(){}
 	this.onClose = function(){}
