@@ -61,9 +61,9 @@ var FlicRawClient = function(inetAddress, port) {
 
 		DisconnectReason: {
 			Unspecified: 0,
-			ConnectionEstablishmentFailed: 0,
-			TimedOut: 1,
-			BondingKeysMismatch: 2
+			ConnectionEstablishmentFailed: 1,
+			TimedOut: 2,
+			BondingKeysMismatch: 3
 		},
 
 		RemovedReason: {
