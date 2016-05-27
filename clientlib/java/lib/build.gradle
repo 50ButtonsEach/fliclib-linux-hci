@@ -1,0 +1,16 @@
+apply plugin: 'java'
+
+version = '1.0'
+
+jar {
+    manifest {
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+
+}
