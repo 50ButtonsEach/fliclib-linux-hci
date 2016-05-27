@@ -31,7 +31,7 @@ Summary
     * [CmdCreateConnectionChannel](#cmdcreateconnectionchannel)
     * [CmdRemoveConnectionChannel](#cmdremoveconnectionchannel)
     * [CmdForceDisconnect](#cmdforcedisconnect)
-    * [CmdSetLatencyMode](#cmdsetlatencymode)
+    * [CmdChangeModeParameters](#cmdchangemodeparameters)
     * [CmdPing](#cmdping)
   * [Events](#events)
     * [EvtAdvertisementPacket](#evtadvertisementpacket)
