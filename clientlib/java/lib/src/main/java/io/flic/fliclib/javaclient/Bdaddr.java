@@ -18,11 +18,11 @@ public class Bdaddr {
     public Bdaddr(String addr) {
         bytes = new byte[6];
         bytes[5] = (byte)Integer.parseInt(addr.substring(0, 2), 16);
-        bytes[4] = (byte)Integer.parseInt(addr.substring(3, 2), 16);
-        bytes[3] = (byte)Integer.parseInt(addr.substring(6, 2), 16);
-        bytes[2] = (byte)Integer.parseInt(addr.substring(9, 2), 16);
-        bytes[1] = (byte)Integer.parseInt(addr.substring(12, 2), 16);
-        bytes[0] = (byte)Integer.parseInt(addr.substring(15, 2), 16);
+        bytes[4] = (byte)Integer.parseInt(addr.substring(3, 5), 16);
+        bytes[3] = (byte)Integer.parseInt(addr.substring(6, 8), 16);
+        bytes[2] = (byte)Integer.parseInt(addr.substring(9, 11), 16);
+        bytes[1] = (byte)Integer.parseInt(addr.substring(12, 14), 16);
+        bytes[0] = (byte)Integer.parseInt(addr.substring(15, 17), 16);
     }
 
     Bdaddr(InputStream stream) throws IOException {
