@@ -26,7 +26,7 @@ If you have compiled your own kernel you must make sure to include support for B
 ### Bluetooth controllers
 All Bluetooth controllers with support for Bluetooth 4.0 and Bluetooth Low Energy (Bluetooth Smart) that have Linux support should work. We have tested compatibility with some common Bluetooth controllers. The following devices have been tested and confirmed:
 
-**Plugable USB Bluetooth 4.0 Low Energy Micro Adapter (Broadcom BCM20702 Bluetooth 4.0)**
+**Plugable USB Bluetooth 4.0 Low Energy Micro Adapter / Asus USB-BT400 (Broadcom BCM20702 Bluetooth 4.0)**
 - Supports 14 concurrent connections and in total 32 pending connections.
 
 **Raspberry Pi 3 model B (Broadcom BCM43438 Bluetooth 4.1)**
@@ -40,7 +40,7 @@ All Bluetooth controllers with support for Bluetooth 4.0 and Bluetooth Low Energ
 
 ## Quick start
 ### Packages
-The only dependency is libcurl, which should be installed by default on most Linux distributions.
+There are no dependencies except the standard C/C++ libraries, which should be installed by default on most Linux distributions.
 ### Running
 It might be a good idea to disable a currently running bluez daemon (bluetoothd) to avoid interference, although not necessary. To see if it's running, run `ps aux | grep bluetoothd`. If it's running, try to disable it through the system's tools `service bluetooth stop` or `systemctl stop bluetooth` on Ubuntu, or just kill the process.
 
@@ -48,7 +48,7 @@ The server process needs to have access to the Bluetooth HCI channel. There are 
 
 Now start the daemon in one terminal by executing `./flicd -f flic.sqlite3`. Additional options are listed if you leave out the database argument.
 
-In another terminal, `cd simpleclient`, compile it with `make` and run with `./simpleclient localhost`. You will be shown the available commands. Type `startScan` and press enter to start scanning for buttons. Then press your flic button (and make sure it is disconnected to any other devices such as a smartphone) and you should see it appear. Type `stopScan` and press enter to stop scanning (it's ok if output text are interleaved with what you type). Hold your Flic button for 7 seconds to make it public, and make sure that it glows red. Then enter the command `connect <BDADDR> <id>` where `<BDADDR>` is the address that appeared during scan. For `<id>`, put any integer that will be used later to refer to this connection. The button should now connect and you will see click events appear. Type `disconnect <id>` to later disconnect.
+In another terminal open the simpleclient directory, compile it with make and run with `./simpleclient localhost`. You will be shown the available commands. Type `startScanWizard` and press enter to scan and add a button. Then press your flic button (and make sure it is disconnected to any other devices such as a smartphone) and follow the instructions in the console. After your button has been added, enter the command `connect <BDADDR> <id>` where `<BDADDR>` is the address that appeared during scan. For `<id>`, put any integer that will be used later to refer to this connection. The button should now connect and you will see click events appear. Type `disconnect <id>` to later disconnect.
 
 You can also try out the websocket example. Run both the daemon and the websocket proxy. Then open up the client html page.
 
@@ -78,6 +78,8 @@ Usage: ./flicd -f sqlite_db_file.db [options]
 -d  --daemon        Run flicd as a Linux daemon.
 
 -l  --log-file      Specify a log file name instead of using stderr.
+
+-w  --wait-for-hci  When starting flicd, wait for hci endpoint to become available instead of exiting with failure status.
 ```
 
 ## Troubleshooting

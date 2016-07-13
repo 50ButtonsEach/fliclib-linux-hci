@@ -69,6 +69,16 @@ enum LatencyMode {
 	HighLatency
 } PACKED;
 
+enum ScanWizardResult {
+	WizardSuccess,
+	WizardCancelledByUser,
+	WizardFailedTimeout,
+	WizardButtonIsPrivate,
+	WizardBluetoothUnavailable,
+	WizardInternetBackendError,
+	WizardInvalidData
+} PACKED;
+
 enum BluetoothControllerState {
 	Detached,
 	Resetting,
@@ -128,6 +138,24 @@ typedef struct {
 	uint8_t opcode;
 	uint32_t ping_id;
 } PACKED CmdPing;
+
+#define CMD_GET_BUTTON_UUID_OPCODE 8
+typedef struct {
+	uint8_t opcode;
+	uint8_t bd_addr[6];
+} PACKED CmdGetButtonUUID;
+
+#define CMD_CREATE_SCAN_WIZARD_OPCODE 9
+typedef struct {
+	uint8_t opcode;
+	uint32_t scan_wizard_id;
+} PACKED CmdCreateScanWizard;
+
+#define CMD_CANCEL_SCAN_WIZARD_OPCODE 10
+typedef struct {
+	uint8_t opcode;
+	uint32_t scan_wizard_id;
+} PACKED CmdCancelScanWizard;
 
 /// Events
 
@@ -222,6 +250,42 @@ typedef struct {
 	uint8_t opcode;
 	uint32_t ping_id;
 } PACKED EvtPingResponse;
+
+#define EVT_GET_BUTTON_UUID_RESPONSE_OPCODE 14
+typedef struct {
+	uint8_t opcode;
+	uint8_t bd_addr[6];
+	uint8_t uuid[16];
+} PACKED EvtGetButtonUUIDResponse;
+
+typedef struct {
+	uint8_t opcode;
+	uint32_t scan_wizard_id;
+} PACKED EvtScanWizardBase;
+
+#define EVT_SCAN_WIZARD_FOUND_PRIVATE_BUTTON_OPCODE 15
+typedef struct {
+	EvtScanWizardBase base;
+} PACKED EvtScanWizardFoundPrivateButton;
+
+#define EVT_SCAN_WIZARD_FOUND_PUBLIC_BUTTON_OPCODE 16
+typedef struct {
+	EvtScanWizardBase base;
+	uint8_t bd_addr[6];
+	uint8_t name_length;
+	char name[16];
+} PACKED EvtScanWizardFoundPublicButton;
+
+#define EVT_SCAN_WIZARD_BUTTON_CONNECTED_OPCODE 17
+typedef struct {
+	EvtScanWizardBase base;
+} PACKED EvtScanWizardButtonConnected;
+
+#define EVT_SCAN_WIZARD_COMPLETED_OPCODE 18
+typedef struct {
+	EvtScanWizardBase base;
+	enum ScanWizardResult result;
+} PACKED EvtScanWizardCompleted;
 
 #ifdef __cplusplus
 }

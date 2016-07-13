@@ -49,7 +49,9 @@ static const char* RemovedReasonStrings[] = {
 	"ButtonIsPrivate",
 	"VerifyTimeout",
 	"InternetBackendError",
-	"InvalidData"
+	"InvalidData",
+	
+	"CouldntLoadDevice"
 };
 
 static const char* ClickTypeStrings[] = {
@@ -70,6 +72,16 @@ static const char* LatencyModeStrings[] = {
 	"NormalLatency",
 	"LowLatency",
 	"HighLatency"
+};
+
+static const char* ScanWizardResultStrings[] = {
+	"WizardSuccess",
+	"WizardCancelledByUser",
+	"WizardFailedTimeout",
+	"WizardButtonIsPrivate",
+	"WizardBluetoothUnavailable",
+	"WizardInternetBackendError",
+	"WizardInvalidData"
 };
 
 static const char* BluetoothControllerStateStrings[] = {
@@ -184,12 +196,15 @@ static void print_help() {
 	static const char help_text[] =
 	"Available commands:\n"
 	"getInfo - get various info about the server state and previously verified buttons\n"
-	"startScan - start a scanning of Flic buttons\n"
-	"stopScan - stop scanning\n"
+	"startScanWizard - start scan wizard\n"
+	"cancelScanWizard - cancel scan wizard\n"
+	"startScan - start a raw scanning of Flic buttons\n"
+	"stopScan - stop raw scanning\n"
 	"connect xx:xx:xx:xx:xx:xx id - first parameter is the bluetooth address of the button, second is an integer identifier you set to identify this connection\n"
 	"disconnect id - disconnect or abort pending connection\n"
 	"changeModeParameters id latency_mode auto_disconnect_time - change latency mode (NormalLatency/LowLatency/HighLatency) and auto disconnect time for this connection\n"
 	"forceDisconnect xx:xx:xx:xx:xx:xx - disconnect this button, even if other client program are connected\n"
+	"getButtonUUID xx:xx:xx:xx:xx:xx - get button uuid for a verified button\n"
 	"help - prints this help text\n"
 	"\n";
 	fprintf(stderr, help_text);
@@ -250,6 +265,20 @@ int main(int argc, char* argv[]) {
 		}
 		if (FD_ISSET(STDIN_FILENO, &fdread)) {
 			scanf("%s", cmd);
+			if (strcmp("startScanWizard", cmd) == 0) {
+				CmdCreateScanWizard cmd;
+				cmd.opcode = CMD_CREATE_SCAN_WIZARD_OPCODE;
+				cmd.scan_wizard_id = 0;
+				write_packet(sockfd, &cmd, sizeof(cmd));
+				
+				printf("Please click your Flic button!\n");
+			}
+			if (strcmp("cancelScanWizard", cmd) == 0) {
+				CmdCancelScanWizard cmd;
+				cmd.opcode = CMD_CANCEL_SCAN_WIZARD_OPCODE;
+				cmd.scan_wizard_id = 0;
+				write_packet(sockfd, &cmd, sizeof(cmd));
+			}
 			if (strcmp("startScan", cmd) == 0) {
 				CmdCreateScanner cmd;
 				cmd.opcode = CMD_CREATE_SCANNER_OPCODE;
@@ -298,6 +327,12 @@ int main(int argc, char* argv[]) {
 				}
 				cmd.latency_mode = (enum LatencyMode)mode;
 				cmd.auto_disconnect_time = auto_disconnect_time;
+				write_packet(sockfd, &cmd, sizeof(cmd));
+			}
+			if (strcmp("getButtonUUID", cmd) == 0) {
+				CmdGetButtonUUID cmd;
+				cmd.opcode = CMD_GET_BUTTON_UUID_OPCODE;
+				memcpy(cmd.bd_addr, read_bdaddr().addr, 6);
 				write_packet(sockfd, &cmd, sizeof(cmd));
 			}
 			if (strcmp("getInfo", cmd) == 0) {
@@ -410,6 +445,29 @@ int main(int argc, char* argv[]) {
 				case EVT_BLUETOOTH_CONTROLLER_STATE_CHANGE_OPCODE: {
 					EvtBluetoothControllerStateChange* evt = (EvtBluetoothControllerStateChange*)pkt;
 					printf("Bluetooth state change: %d\n", evt->state);
+					break;
+				}
+				case EVT_GET_BUTTON_UUID_RESPONSE_OPCODE: {
+					EvtGetButtonUUIDResponse* evt = (EvtGetButtonUUIDResponse*)pkt;
+					printf("Button UUID response: %s %s\n", Bdaddr(evt->bd_addr).to_string().c_str(), bytes_to_hex_string(evt->uuid, sizeof(evt->uuid)).c_str());
+					break;
+				}
+				case EVT_SCAN_WIZARD_FOUND_PRIVATE_BUTTON_OPCODE: {
+					printf("Found private button. Please hold down it for 7 seconds to make it public.\n");
+					break;
+				}
+				case EVT_SCAN_WIZARD_FOUND_PUBLIC_BUTTON_OPCODE: {
+					EvtScanWizardFoundPublicButton* evt = (EvtScanWizardFoundPublicButton*)pkt;
+					printf("Found public button %s %s, connecting...\n", Bdaddr(evt->bd_addr).to_string().c_str(), string(evt->name, (size_t)evt->name_length).c_str());
+					break;
+				}
+				case EVT_SCAN_WIZARD_BUTTON_CONNECTED_OPCODE: {
+					printf("Connected, now pairing and verifying...\n");
+					break;
+				}
+				case EVT_SCAN_WIZARD_COMPLETED_OPCODE: {
+					EvtScanWizardCompleted* evt = (EvtScanWizardCompleted*)pkt;
+					printf("Scan wizard done with status %s\n", ScanWizardResultStrings[evt->result]);
 					break;
 				}
 			}

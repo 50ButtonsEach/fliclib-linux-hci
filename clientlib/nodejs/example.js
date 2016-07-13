@@ -1,6 +1,6 @@
 /*
  * This example program connects to already paired buttons and register event listeners on button events.
- * Run the scanwizard.js program to add buttons.
+ * Run the newscanwizard.js program to add buttons.
  */
 
 

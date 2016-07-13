@@ -14,7 +14,10 @@ var FlicCommandOpcodes = {
 	RemoveConnectionChannel: 4,
 	ForceDisconnect: 5,
 	ChangeModeParameters: 6,
-	Ping: 7
+	Ping: 7,
+	GetButtonUUID: 8,
+	CreateScanWizard: 9,
+	CancelScanWizard: 10
 };
 
 var FlicEventOpcodes = {
@@ -31,7 +34,12 @@ var FlicEventOpcodes = {
 	NoSpaceForNewConnection: 10,
 	GotSpaceForNewConnection: 11,
 	BluetoothControllerStateChange: 12,
-	PingResponse: 13
+	PingResponse: 13,
+	GetButtonUUIDResponse: 14,
+	ScanWizardFoundPrivateButton: 15,
+	ScanWizardFoundPublicButton: 16,
+	ScanWizardButtonConnected: 17,
+	ScanWizardCompleted: 18
 };
 
 /**
@@ -77,7 +85,9 @@ var FlicRawWebsocketClient = function(wsAddress) {
 			ButtonIsPrivate: 3,
 			VerifyTimeout: 4,
 			InternetBackendError: 5,
-			InvalidData: 6
+			InvalidData: 6,
+			
+			CouldntLoadDevice: 7
 		},
 
 		ClickType: {
@@ -98,6 +108,16 @@ var FlicRawWebsocketClient = function(wsAddress) {
 			NormalLatency: 0,
 			LowLatency: 1,
 			HighLatency: 2
+		},
+
+		ScanWizardResult: {
+			WizardSuccess: 0,
+			WizardCancelledByUser: 1,
+			WizardFailedTimeout: 2,
+			WizardButtonIsPrivate: 3,
+			WizardBluetoothUnavailable: 4,
+			WizardInternetBackendError: 5,
+			WizardInvalidData: 6
 		},
 
 		BluetoothControllerState: {
@@ -176,6 +196,17 @@ var FlicRawWebsocketClient = function(wsAddress) {
 					}
 				}
 			}
+		}
+		function readUuid() {
+			var str = "";
+			for (var i = 0; i < 16; i++) {
+				str += (0x100 + pkt[pos + i]).toString(16).substr(-2);
+			}
+			pos += 16;
+			if (str == "00000000000000000000000000000000") {
+				str = null;
+			}
+			return str;
 		}
 		
 		var opcode = readUInt8();
@@ -273,7 +304,40 @@ var FlicRawWebsocketClient = function(wsAddress) {
 			case FlicEventOpcodes.PingResponse: {
 				var evt = {
 					pingId: readInt32()
-				}
+				};
+				me.onEvent(opcode, evt);
+				break;
+			}
+			case FlicEventOpcodes.GetButtonUUIDResponse: {
+				var evt = {
+					bdAddr: readBdAddr(),
+					uuid: readUuid()
+				};
+				me.onEvent(opcode, evt);
+				break;
+			}
+			case FlicEventOpcodes.ScanWizardFoundPrivateButton:
+			case FlicEventOpcodes.ScanWizardButtonConnected: {
+				var evt = {
+					scanWizardId: readInt32()
+				};
+				me.onEvent(opcode, evt);
+				break;
+			}
+			case FlicEventOpcodes.ScanWizardFoundPublicButton: {
+				var evt = {
+					scanWizardId: readInt32(),
+					bdAddr: readBdAddr(),
+					name: readName()
+				};
+				me.onEvent(opcode, evt);
+				break;
+			}
+			case FlicEventOpcodes.ScanWizardCompleted: {
+				var evt = {
+					scanWizardId: readInt32(),
+					result: readEnum("ScanWizardResult")
+				};
 				me.onEvent(opcode, evt);
 				break;
 			}
@@ -325,7 +389,8 @@ var FlicRawWebsocketClient = function(wsAddress) {
 				writeInt32(obj.connId);
 				break;
 			}
-			case FlicCommandOpcodes.ForceDisconnect: {
+			case FlicCommandOpcodes.ForceDisconnect:
+			case FlicCommandOpcodes.GetButtonUUID: {
 				writeBdAddr(obj.bdAddr);
 				break;
 			}
@@ -337,6 +402,11 @@ var FlicRawWebsocketClient = function(wsAddress) {
 			}
 			case FlicCommandOpcodes.Ping: {
 				writeInt32(obj.pingId);
+				break;
+			}
+			case FlicCommandOpcodes.CreateScanWizard:
+			case FlicCommandOpcodes.CancelScanWizard: {
+				writeInt32(obj.scanWizardId);
 				break;
 			}
 			default:
@@ -483,11 +553,68 @@ var FlicScanner = (function() {
 			rawClient.sendCommand(FlicCommandOpcodes.RemoveScanner, {
 				scanId: id
 			});
-		}
+		};
 		this._onEvent = function(opcode, event) {
 			switch (opcode) {
 				case FlicEventOpcodes.AdvertisementPacket:
 					onAdvertisementPacket(event.bdAddr, event.name, event.rssi, event.isPrivate, event.alreadyVerified);
+					break;
+			}
+		};
+	}
+})();
+
+/*
+ * FlicScanWizard
+ *
+ * First create a FlicScanWizard, then add it to the FlicClient.
+ */
+var FlicScanWizard = (function() {
+	var counter = 0;
+	
+	return function(options) {
+		options = options || {};
+		
+		var onFoundPrivateButton = options.onFoundPrivateButton || function(){};
+		var onFoundPublicButton = options.onFoundPublicButton || function(bdAddr, name){}
+		var onButtonConnected = options.onButtonConnected || function(bdAddr, name){}
+		var onCompleted = options.onCompleted || function(result, bdAddr, name){}
+		
+		var id = counter++;
+		var _bdaddr = null;
+		var _name = null;
+		
+		this._getId = function() { return id; };
+		
+		this._attach = function(rawClient) {
+			rawClient.sendCommand(FlicCommandOpcodes.CreateScanWizard, {
+				scanWizardId: id
+			});
+		};
+		this._detach = function(rawClient) {
+			rawClient.sendCommand(FlicCommandOpcodes.CancelScanWizard, {
+				scanWizardId: id
+			});
+		};
+		this._onEvent = function(opcode, event) {
+			switch (opcode) {
+				case FlicEventOpcodes.ScanWizardFoundPrivateButton:
+					onFoundPrivateButton();
+					break;
+				case FlicEventOpcodes.ScanWizardFoundPublicButton:
+					_bdaddr = event.bdAddr;
+					_name = event.name;
+					onFoundPublicButton(_bdaddr, _name);
+					break;
+				case FlicEventOpcodes.ScanWizardButtonConnected:
+					onButtonConnected(_bdaddr, _name);
+					break;
+				case FlicEventOpcodes.ScanWizardCompleted:
+					var bdaddr = _bdaddr;
+					var name = _name;
+					_bdaddr = null;
+					_name = null;
+					onCompleted(event.result, bdaddr, name);
 					break;
 			}
 		};
@@ -505,9 +632,11 @@ var FlicClient = function(wsAddress) {
 	var me = this;
 	
 	var scanners = {};
+	var scanWizards = {};
 	var connectionChannels = {};
 	
 	var getInfoResponseCallbackQueue = [];
+	var getButtonUUIDCallbackQueue = [];
 	
 	rawClient.onWsOpen = function(event) {
 		me.onReady();
@@ -562,6 +691,24 @@ var FlicClient = function(wsAddress) {
 				me.onBluetoothControllerStateChange(event.state);
 				break;
 			}
+			case FlicEventOpcodes.GetButtonUUIDResponse: {
+				var callback = getButtonUUIDCallbackQueue.shift();
+				callback(event.bdAddr, event.uuid);
+				break;
+			}
+			case FlicEventOpcodes.ScanWizardFoundPrivateButton:
+			case FlicEventOpcodes.ScanWizardFoundPublicButton:
+			case FlicEventOpcodes.ScanWizardButtonConnected:
+			case FlicEventOpcodes.ScanWizardCompleted: {
+				if (scanWizards[event.scanWizardId]) {
+					var scanWizard = scanWizards[event.scanWizardId];
+					if (opcode == FlicEventOpcodes.ScanWizardCompleted) {
+						delete scanWizards[event.scanWizardId];
+					}
+					scanWizard._onEvent(opcode, event);
+				}
+				break;
+			}
 		}
 	};
 	
@@ -578,6 +725,20 @@ var FlicClient = function(wsAddress) {
 		}
 		delete scanners[flicScanner._getId()];
 		flicScanner._detach(rawClient);
+	};
+	
+	this.addScanWizard = function(flicScanWizard) {
+		if (flicScanWizard._getId() in scanWizards) {
+			return;
+		}
+		scanWizards[flicScanWizard._getId()] = flicScanWizard;
+		flicScanWizard._attach(rawClient);
+	};
+	this.cancelScanWizard = function(flicScanWizard) {
+		if (!(flicScanWizard._getId() in scanWizards)) {
+			return;
+		}
+		flicScanWizard._detach(rawClient);
 	};
 	
 	this.addConnectionChannel = function(connectionChannel) {
@@ -597,6 +758,11 @@ var FlicClient = function(wsAddress) {
 	this.getInfo = function(callback) {
 		getInfoResponseCallbackQueue.push(callback);
 		rawClient.sendCommand(FlicCommandOpcodes.GetInfo, {});
+	};
+	
+	this.getButtonUUID = function(bdAddr, callback) {
+		getButtonUUIDCallbackQueue.push(callback);
+		rawClient.sendCommand(FlicCommandOpcodes.GetButtonUUID, {bdAddr: bdAddr});
 	};
 	
 	this.onReady = function(){}

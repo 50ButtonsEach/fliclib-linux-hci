@@ -68,7 +68,7 @@ function startScanWizard() {
 	
 	$("#addBtnResult").text("Welcome to the add new button wizard. Press your Flic button to add it.");
 	
-	var finished = false;
+	/*var finished = false;
 	function success(cc, bdAddr) {
 		client.removeConnectionChannel(cc);
 		$("#addBtnResult").text("Button " + bdAddr + " successfully added!");
@@ -84,6 +84,7 @@ function startScanWizard() {
 		$("#cancelAddBtn").hide();
 	}
 	var cc = null;
+	
 	var scanner = new FlicScanner({
 		onAdvertisementPacket: function(bdAddr, name, rssi, isPrivate, alreadyVerified) {
 			if (alreadyVerified) {
@@ -139,6 +140,32 @@ function startScanWizard() {
 		}
 		$("#addBtnResult").text("");
 		done();
+	};*/
+	
+	var scanWizard = new FlicScanWizard({
+		onFoundPrivateButton: function() {
+			$("#addBtnResult").text("Your button is private. Hold down for 7 seconds to make it public.");
+		},
+		onFoundPublicButton: function(bdAddr, name) {
+			$("#addBtnResult").text("Found public button " + bdAddr + " (" + name + "). Now connecting...");
+		},
+		onButtonConnected: function(bdAddr, name) {
+			$("#addBtnResult").text("Connected, now verifying and pairing...");
+		},
+		onCompleted: function(result, bdAddr, name) {
+			if (result == "WizardSuccess") {
+				$("#addBtnResult").text("Button " + bdAddr + " successfully added!");
+			} else if (result != "WizardCancelledByUser") {
+				$("#addBtnResult").text("Scan wizard failed: " + result);
+			}
+			$("#addBtn").show();
+			$("#cancelAddBtn").hide();
+		}
+	});
+	client.addScanWizard(scanWizard);
+	window.stopScanWizard = function() {
+		client.cancelScanWizard(scanWizard);
+		$("#addBtnResult").text("");
 	};
 }
 

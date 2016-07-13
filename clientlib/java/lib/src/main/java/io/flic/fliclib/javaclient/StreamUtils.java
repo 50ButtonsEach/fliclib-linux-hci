@@ -32,6 +32,14 @@ class StreamUtils {
         return new Bdaddr(stream);
     }
 
+    public static byte[] getByteArr(InputStream stream, int len) throws IOException {
+        byte[] arr = new byte[len];
+        for (int i = 0; i < len; i++) {
+            arr[i] = (byte)stream.read();
+        }
+        return arr;
+    }
+
     public static void writeEnum(OutputStream stream, Enum<?> enumValue) throws IOException {
         stream.write(enumValue.ordinal());
     }

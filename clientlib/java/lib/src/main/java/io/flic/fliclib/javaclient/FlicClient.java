@@ -8,6 +8,7 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
+import java.util.ArrayDeque;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -31,7 +32,9 @@ public class FlicClient {
 
     private ConcurrentHashMap<Integer, ButtonScanner> scanners = new ConcurrentHashMap<>();
     private ConcurrentHashMap<Integer, ButtonConnectionChannel> connectionChannels = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<Integer, ScanWizard> scanWizards = new ConcurrentHashMap<>();
     private ConcurrentLinkedQueue<GetInfoResponseCallback> getInfoResponseCallbackQueue = new ConcurrentLinkedQueue<>();
+    private ArrayDeque<GetButtonUUIDResponseCallback> getButtonUUIDResponseCallbackQueue = new ArrayDeque<>();
 
     private volatile GeneralCallbacks generalCallbacks = new GeneralCallbacks();
 
@@ -112,6 +115,35 @@ public class FlicClient {
     }
 
     /**
+     * Get button uuid for a verified button.
+     *
+     * The server will send back its information directly and the callback will be called once the response arrives.
+     * Responses will arrive in the same order as requested.
+     *
+     * If the button isn't verified, the uuid sent to callback will be null.
+     *
+     * @param bdaddr The bluetooth address.
+     * @param callback Callback for the response.
+     * @throws IOException
+     */
+    public void getButtonUUID(final Bdaddr bdaddr, final GetButtonUUIDResponseCallback callback) throws IOException {
+        if (callback == null) {
+            throw new IllegalArgumentException("callback is null");
+        }
+        // Run on events thread to ensure ordering if multiple requests are issued at the same time
+        runOnHandleEventsThread(new TimerTask() {
+            @Override
+            public void run() throws IOException {
+                getButtonUUIDResponseCallbackQueue.add(callback);
+
+                CmdGetButtonUUID pkt = new CmdGetButtonUUID();
+                pkt.bdaddr = bdaddr;
+                sendPacket(pkt);
+            }
+        });
+    }
+
+    /**
      * Add a scanner.
      *
      * The scan will start directly once the scanner is added.
@@ -148,6 +180,47 @@ public class FlicClient {
 
         CmdRemoveScanner pkt = new CmdRemoveScanner();
         pkt.scanId = buttonScanner.scanId;
+        sendPacket(pkt);
+    }
+    
+    /**
+     * Add a scan wizard.
+     *
+     * The scan wizard will start directly once the scan wizard is added.
+     *
+     * @param scanWizard
+     * @throws IOException
+     */
+    public void addScanWizard(ScanWizard scanWizard) throws IOException {
+        if (scanWizard == null) {
+            throw new IllegalArgumentException("scanWizard is null");
+        }
+        if (scanWizards.putIfAbsent(scanWizard.scanWizardId, scanWizard) != null) {
+            throw new IllegalArgumentException("Scan wizard already added");
+        }
+        
+        CmdCreateScanWizard pkt = new CmdCreateScanWizard();
+        pkt.scanWizardId = scanWizard.scanWizardId;
+        sendPacket(pkt);
+    }
+    
+    /**
+     * Cancel a scan wizard.
+     *
+     * This will cancel an ongoing scan wizard.
+     *
+     * If cancelled due to this request, the result of the scan wizard will be WizardCancelledByUser.
+     *
+     * @param scanWizard The same scan wizard that was used in {@link #addScanWizard(ScanWizard)}
+     * @throws IOException
+     */
+    public void cancelScanWizard(ScanWizard scanWizard) throws IOException {
+        if (scanWizard == null) {
+            throw new IllegalArgumentException("scanWizard is null");
+        }
+        
+        CmdCancelScanWizard pkt = new CmdCancelScanWizard();
+        pkt.scanWizardId = scanWizard.scanWizardId;
         sendPacket(pkt);
     }
 
@@ -425,6 +498,55 @@ public class FlicClient {
                 GeneralCallbacks gc = generalCallbacks;
                 if (gc != null) {
                     gc.onBluetoothControllerStateChange(pkt.state);
+                }
+                break;
+            }
+            case EventPacket.EVT_GET_BUTTON_UUID_RESPONSE_OPCODE: {
+                EvtGetButtonUUIDResponse pkt = new EvtGetButtonUUIDResponse();
+                pkt.parse(packet);
+                getButtonUUIDResponseCallbackQueue.remove().onGetButtonUUIDResponse(pkt.bdaddr, pkt.uuid);
+                break;
+            }
+            case EventPacket.EVT_SCAN_WIZARD_FOUND_PRIVATE_BUTTON_OPCODE: {
+                EvtScanWizardFoundPrivateButton pkt = new EvtScanWizardFoundPrivateButton();
+                pkt.parse(packet);
+                ScanWizard wizard = scanWizards.get(pkt.scanWizardId);
+                if (wizard != null) {
+                    wizard.onFoundPrivateButton();
+                }
+                break;
+            }
+            case EventPacket.EVT_SCAN_WIZARD_FOUND_PUBLIC_BUTTON_OPCODE: {
+                EvtScanWizardFoundPublicButton pkt = new EvtScanWizardFoundPublicButton();
+                pkt.parse(packet);
+                ScanWizard wizard = scanWizards.get(pkt.scanWizardId);
+                if (wizard != null) {
+                    wizard.bdaddr = pkt.addr;
+                    wizard.name = pkt.name;
+                    wizard.onFoundPublicButton(wizard.bdaddr, wizard.name);
+                }
+                break;
+            }
+            case EventPacket.EVT_SCAN_WIZARD_BUTTON_CONNECTED_OPCODE: {
+                EvtScanWizardButtonConnected pkt = new EvtScanWizardButtonConnected();
+                pkt.parse(packet);
+                ScanWizard wizard = scanWizards.get(pkt.scanWizardId);
+                if (wizard != null) {
+                    wizard.onButtonConnected(wizard.bdaddr, wizard.name);
+                }
+                break;
+            }
+            case EventPacket.EVT_SCAN_WIZARD_COMPLETED_OPCODE: {
+                EvtScanWizardCompleted pkt = new EvtScanWizardCompleted();
+                pkt.parse(packet);
+                ScanWizard wizard = scanWizards.get(pkt.scanWizardId);
+                scanWizards.remove(pkt.scanWizardId);
+                if (wizard != null) {
+                    Bdaddr bdaddr = wizard.bdaddr;
+                    String name = wizard.name;
+                    wizard.bdaddr = null;
+                    wizard.name = null;
+                    wizard.onCompleted(pkt.result, bdaddr, name);
                 }
                 break;
             }

@@ -116,6 +116,36 @@ class CmdPing extends CommandPacket {
     }
 }
 
+class CmdGetButtonUUID extends CommandPacket {
+    public Bdaddr bdaddr;
+
+    @Override
+    protected void write(OutputStream stream) throws IOException {
+        opcode = 8;
+        StreamUtils.writeBdaddr(stream, bdaddr);
+    }
+}
+
+class CmdCreateScanWizard extends CommandPacket {
+    public int scanWizardId;
+
+    @Override
+    protected void write(OutputStream stream) throws IOException {
+        opcode = 9;
+        StreamUtils.writeInt32(stream, scanWizardId);
+    }
+}
+
+class CmdCancelScanWizard extends CommandPacket {
+    public int scanWizardId;
+
+    @Override
+    protected void write(OutputStream stream) throws IOException {
+        opcode = 10;
+        StreamUtils.writeInt32(stream, scanWizardId);
+    }
+}
+
 abstract class EventPacket {
     public static final int EVT_ADVERTISEMENT_PACKET_OPCODE = 0;
     public static final int EVT_CREATE_CONNECTION_CHANNEL_RESPONSE_OPCODE = 1;
@@ -130,6 +160,12 @@ abstract class EventPacket {
     public static final int EVT_NO_SPACE_FOR_NEW_CONNECTION_OPCODE = 10;
     public static final int EVT_GOT_SPACE_FOR_NEW_CONNECTION_OPCODE = 11;
     public static final int EVT_BLUETOOTH_CONTROLLER_STATE_CHANGE_OPCODE = 12;
+    public static final int EVT_PING_RESPONSE_OPCODE = 13;
+    public static final int EVT_GET_BUTTON_UUID_RESPONSE_OPCODE = 14;
+    public static final int EVT_SCAN_WIZARD_FOUND_PRIVATE_BUTTON_OPCODE = 15;
+    public static final int EVT_SCAN_WIZARD_FOUND_PUBLIC_BUTTON_OPCODE = 16;
+    public static final int EVT_SCAN_WIZARD_BUTTON_CONNECTED_OPCODE = 17;
+    public static final int EVT_SCAN_WIZARD_COMPLETED_OPCODE = 18;
 
     public void parse(byte[] arr) {
         InputStream stream = new ByteArrayInputStream(arr);
@@ -282,5 +318,74 @@ class EvtBluetoothControllerStateChange extends EventPacket {
     @Override
     protected void parseInternal(InputStream stream) throws IOException {
         state = BluetoothControllerState.values()[StreamUtils.getUInt8(stream)];
+    }
+}
+
+class EvtGetButtonUUIDResponse extends EventPacket {
+    public Bdaddr bdaddr;
+    public String uuid;
+
+    @Override
+    protected void parseInternal(InputStream stream) throws IOException {
+        bdaddr = StreamUtils.getBdaddr(stream);
+        byte[] uuidBytes = StreamUtils.getByteArr(stream, 16);
+        StringBuilder sb = new StringBuilder(32);
+        for (int i = 0; i < 16; i++) {
+            sb.append(String.format("%02x", uuidBytes[i]));
+        }
+        uuid = sb.toString();
+        if (uuid.equals("00000000000000000000000000000000")) {
+            uuid = null;
+        }
+    }
+}
+
+class EvtScanWizardFoundPrivateButton extends EventPacket {
+    public int scanWizardId;
+    
+    @Override
+    protected void parseInternal(InputStream stream) throws IOException {
+        scanWizardId = StreamUtils.getInt32(stream);
+    }
+}
+
+class EvtScanWizardFoundPublicButton extends EventPacket {
+    public int scanWizardId;
+    public Bdaddr addr;
+    public String name;
+    
+    @Override
+    protected void parseInternal(InputStream stream) throws IOException {
+        scanWizardId = StreamUtils.getInt32(stream);
+        addr = StreamUtils.getBdaddr(stream);
+        int nameLen = StreamUtils.getUInt8(stream);
+        byte[] bytes = new byte[nameLen];
+        for (int i = 0; i < nameLen; i++) {
+            bytes[i] = (byte)stream.read();
+        }
+        for (int i = nameLen; i < 16; i++) {
+            stream.skip(1);
+        }
+        name = new String(bytes, StandardCharsets.UTF_8);
+    }
+}
+
+class EvtScanWizardButtonConnected extends EventPacket {
+    public int scanWizardId;
+    
+    @Override
+    protected void parseInternal(InputStream stream) throws IOException {
+        scanWizardId = StreamUtils.getInt32(stream);
+    }
+}
+
+class EvtScanWizardCompleted extends EventPacket {
+    public int scanWizardId;
+    public ScanWizardResult result;
+    
+    @Override
+    protected void parseInternal(InputStream stream) throws IOException {
+        scanWizardId = StreamUtils.getInt32(stream);
+        result = ScanWizardResult.values()[StreamUtils.getUInt8(stream)];
     }
 }

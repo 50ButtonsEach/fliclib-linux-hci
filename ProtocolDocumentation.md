@@ -24,6 +24,7 @@ Summary
     * [BdAddrType](#bdaddrtype)
     * [LatencyMode](#latencymode)
     * [BluetoothControllerState](#bluetoothcontrollerstate)
+    * [ScanWizardResult](#scanwizardresult)
   * [Commands](#commands)
     * [CmdGetInfo](#cmdgetinfo)
     * [CmdCreateScanner](#cmdcreatescanner)
@@ -33,6 +34,9 @@ Summary
     * [CmdForceDisconnect](#cmdforcedisconnect)
     * [CmdChangeModeParameters](#cmdchangemodeparameters)
     * [CmdPing](#cmdping)
+    * [CmdGetButtonUUID](#cmdgetbuttonuuid)
+    * [CmdCreateScanWizard](#cmdcreatescanwizard)
+    * [CmdCancelScanWizard](#cmdcancelscanwizard)
   * [Events](#events)
     * [EvtAdvertisementPacket](#evtadvertisementpacket)
     * [EvtCreateConnectionChannelResponse](#evtcreateconnectionchannelresponse)
@@ -45,6 +49,11 @@ Summary
     * [EvtGotSpaceForNewConnection](#evtgotspacefornewconnection)
     * [EvtBluetoothControllerStateChange](#evtbluetoothcontrollerstatechange)
     * [EvtPingResponse](#evtpingresponse)
+    * [EvtGetButtonUUIDResponse](#evtgetbuttonuuidresponse)
+    * [EvtScanWizardFoundPrivateButton](#evtscanwizardfoundprivatebutton)
+    * [EvtScanWizardFoundPublicButton](#evtscanwizardfoundpublicbutton)
+    * [EvtScanWizardButtonConnected](#evtscanwizardbuttonconnected)
+    * [EvtScanWizardCompleted](#evtscanwizardcompleted)
 
 Enums
 -----
@@ -152,6 +161,30 @@ The server software has just got connected to the HCI socket and initiated a res
 **Attached** -
 The bluetooth controller has done initialization and is up and running.
 
+### ScanWizardResult
+The result of a scan wizard. When the scan wizard is completed it will stop and return a result.
+
+**WizardSuccess** -
+Indicates that a button was successfully paired and verified. You may now create a connection channel to that button.
+
+**WizardCancelledByUser** -
+A CmdCancelScanWizard was sent.
+
+**WizardFailedTimeout** -
+The scan wizard did not make any progress for some time. Current timeouts are 20 seconds for finding any button, 20 seconds for finding a public button (in case of a private button was found), 10 seconds for connecting the button, 30 seconds for pairing and verifying the button.
+
+**WizardButtonIsPrivate** -
+First the button was advertising public status, but after connecting it reports private. Probably it switched from public to private just when the connection attempt was started.
+
+**WizardBluetoothUnavailable** -
+The bluetooth controller is not attached.
+
+**WizardInternetBackendError** -
+The internet request to the Flic backend failed.
+
+**WizardInvalidData** -
+According to the Flic backend, this Flic button supplied invalid identity data.
+
 Commands
 --------
 ### CmdGetInfo
@@ -234,6 +267,30 @@ _uint8\_t_: **opcode**: 7
 _uint32\_t_: **ping_id**:
 An identifier that will be sent back in return.
 
+### CmdGetButtonUUID
+Get the 128-bit identifier for a verified button. Each button has a unique identifier. An EvtGetButtonUUIDResponse will be sent back immediately in return with the bd\_addr field set to the same value as in the request. The uuid will be filled in as well. If the button with the given bluetooth address is not verified, the uuid will be all zeros.
+
+_uint8\_t_: **opcode**: 8
+
+_bdaddr\_t_: **bd_addr**:
+Bluetooth device address of the button to look up.
+
+### CmdCreateScanWizard
+Starts a scan wizard. If there already exists a scan wizard with the same id, this does nothing.
+
+_uint8\_t_: **opcode**: 9
+
+_uint32\_t_: **scan_wizard_id**:
+A unique identifier.
+
+### CmdCancelScanWizard
+Cancel a scan wizard that was previously started. If there exists a scan wizard with this id, it is cancelled and an EvtScanWizardCompleted is sent with the reason set to WizardCancelledByUser.
+
+_uint\_t_: **opcode**: 10
+
+_uint32\_t_: **scan_wizard_id**:
+The identifier that was given when the scan wizard was started.
+
 Events
 ------
 ### EvtAdvertisementPacket
@@ -250,7 +307,7 @@ The bluetooth address of this Flic button. Use it to establish a connection chna
 _uint8\_t_ **name_length**:
 The length in bytes of the name following.
 
-_char[16] **name**:
+_char[16]_ **name**:
 The first _name\_length_ bytes of this array contain the UTF-8 encoding of the advertised name. The other bytes will be zeros.
 
 _int8\_t_ **rssi**:
@@ -311,6 +368,9 @@ The following event types are defined:
  - **ButtonSingleOrDoubleClickOrHold**: Possible ClickTypes are ButtonSingleClick, ButtonDoubleClick and ButtonHold. Used if you want to distinguish between a single click, a double click and a hold.
 
 _uint8\_t_ **opcode**: 4, 5, 6 or 7 for the different types of event, in the same order as above.
+
+_uint32\_t_ **conn_id**:
+Connection channel identifier.
 
 _enum ClickType_ **click_type**:
 The click type. For each opcode, there are different possible values.
@@ -393,3 +453,58 @@ _uint8\_t_: **opcode**: 13
 
 _uint32\_t_: **ping_id**:
 Same ping id as sent in the CmdPing.
+
+### EvtGetButtonUUIDResponse
+Sent in return to a CmdGetButtonUUID.
+
+_uint8\_t_: **opcode**: 14
+
+_bdaddr\_t_: **bd_addr**:
+The bluetooth device address of the request.
+
+_uint8\_t[16]_: **uuid**:
+The uuid if the button with the given bluetooth address was found and verified. Otherwise all zeros.
+
+### EvtScanWizardFoundPrivateButton
+Sent once if a private button is found during the scan. If this is received, tell the user to hold the button down for 7 seconds.
+
+_uint8\_t_: **opcode**: 15
+
+_uint32\_t_: **scan_wizard_id**:
+Scan wizard id.
+
+### EvtScanWizardFoundPublicButton
+Sent once if a public button is found during scan. Now the scan wizard stops scanning internally and instead initiates a connection to this button.
+
+_uint8\_t_: **opcode**: 16
+
+_uint32\_t_: **scan_wizard_id**:
+Scan wizard id.
+
+_bdaddr\_t_: **bd_addr**:
+The bluetooth address of the Flic button that was found.
+
+_uint8\_t_ **name_length**:
+The length in bytes of the name following.
+
+_char[16]_ **name**:
+The first _name\_length_ bytes of this array contain the UTF-8 encoding of the advertised name. The other bytes will be zeros.
+
+### EvtScanWizardButtonConnected
+Sent when the found button connects for the first time. Now the verification and pairing process will begin.
+
+_uint8\_t_: **opcode**: 17
+
+_uint32\_t_: **scan_wizard_id**:
+Scan wizard id.
+
+### EvtScanWizardCompleted
+Sent when the scan wizard has completed. See ScanWizardResult documentation for more information.
+
+_uint8\_t_: **opcode**: 18
+
+_uint32\_t_: **scan_wizard_id**:
+Scan wizard id.
+
+_enum ScanWizardResult_: **result**:
+Result of the scan wizard.

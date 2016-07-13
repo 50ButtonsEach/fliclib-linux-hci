@@ -11,5 +11,7 @@ public enum RemovedReason {
     ButtonIsPrivate,
     VerifyTimeout,
     InternetBackendError,
-    InvalidData
+    InvalidData,
+    
+    CouldntLoadDevice
 }

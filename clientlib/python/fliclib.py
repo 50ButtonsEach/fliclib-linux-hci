@@ -45,6 +45,8 @@ class RemovedReason(Enum):
 	VerifyTimeout = 4
 	InternetBackendError = 5
 	InvalidData = 6
+	
+	CouldntLoadDevice = 7
 
 class ClickType(Enum):
 	ButtonDown = 0
@@ -68,6 +70,15 @@ class BluetoothControllerState(Enum):
 	Resetting = 1
 	Attached = 2
 
+class ScanWizardResult(Enum):
+	WizardSuccess = 0
+	WizardCancelledByUser = 1
+	WizardFailedTimeout = 2
+	WizardButtonIsPrivate = 3
+	WizardBluetoothUnavailable = 4
+	WizardInternetBackendError = 5
+	WizardInvalidData = 6
+
 class ButtonScanner:
 	"""ButtonScanner class.
 	
@@ -82,6 +93,29 @@ class ButtonScanner:
 	def __init__(self):
 		self._scan_id = next(ButtonScanner._cnt)
 		self.on_advertisement_packet = lambda scanner, bd_addr, name, rssi, is_private, already_verified: None
+
+class ScanWizard:
+	"""ScanWizard class
+	
+	Usage:
+	wizard = ScanWizard()
+	wizard.on_found_private_button = lambda scan_wizard: ...
+	wizard.on_found_public_button = lambda scan_wizard, bd_addr, name: ...
+	wizard.on_button_connected = lambda scan_wizard, bd_addr, name: ...
+	wizard.on_completed = lambda scan_wizard, result, bd_addr, name: ...
+	client.add_scan_wizard(wizard)
+	"""
+	
+	_cnt = itertools.count()
+	
+	def __init__(self):
+		self._scan_wizard_id = next(ScanWizard._cnt)
+		self._bd_addr = None
+		self._name = None
+		self.on_found_private_button = lambda scan_wizard: None
+		self.on_found_public_button = lambda scan_wizard, bd_addr, name: None
+		self.on_button_connected = lambda scan_wizard, bd_addr, name: None
+		self.on_completed = lambda scan_wizard, result, bd_addr, name: None
 
 class ButtonConnectionChannel:
 	"""ButtonConnectionChannel class.
@@ -188,10 +222,15 @@ class FlicClient:
 		("EvtNoSpaceForNewConnection", "<B", "max_concurrently_connected_buttons"),
 		("EvtGotSpaceForNewConnection", "<B", "max_concurrently_connected_buttons"),
 		("EvtBluetoothControllerStateChange", "<B", "state"),
-		("EvtPingResponse", "<I", "ping_id")
+		("EvtPingResponse", "<I", "ping_id"),
+		("EvtGetButtonUUIDResponse", "<6s16s", "bd_addr uuid"),
+		("EvtScanWizardFoundPrivateButton", "<I", "scan_wizard_id"),
+		("EvtScanWizardFoundPublicButton", "<I6s17p", "scan_wizard_id bd_addr name"),
+		("EvtScanWizardButtonConnected", "<I", "scan_wizard_id"),
+		("EvtScanWizardCompleted", "<IB", "scan_wizard_id result")
 	]
-	_EVENT_STRUCTS = list(map(lambda x: struct.Struct(x[1]), _EVENTS))
-	_EVENT_NAMED_TUPLES = list(map(lambda x: namedtuple(x[0], x[2]), _EVENTS))
+	_EVENT_STRUCTS = list(map(lambda x: None if x == None else struct.Struct(x[1]), _EVENTS))
+	_EVENT_NAMED_TUPLES = list(map(lambda x: None if x == None else namedtuple(x[0], x[2]), _EVENTS))
 	
 	_COMMANDS = [
 		("CmdGetInfo", "", ""),
@@ -201,7 +240,10 @@ class FlicClient:
 		("CmdRemoveConnectionChannel", "<I", "conn_id"),
 		("CmdForceDisconnect", "<6s", "bd_addr"),
 		("CmdChangeModeParameters", "<IBh", "conn_id latency_mode auto_disconnect_time"),
-		("CmdPing", "<I", "ping_id")
+		("CmdPing", "<I", "ping_id"),
+		("CmdGetButtonUUID", "<6s", "bd_addr"),
+		("CmdCreateScanWizard", "<I", "scan_wizard_id"),
+		("CmdCancelScanWizard", "<I", "scan_wizard_id")
 	]
 	
 	_COMMAND_STRUCTS = list(map(lambda x: struct.Struct(x[1]), _COMMANDS))
@@ -218,8 +260,10 @@ class FlicClient:
 		self._sock = socket.create_connection((host, port), None)
 		self._lock = threading.RLock()
 		self._scanners = {}
+		self._scan_wizards = {}
 		self._connection_channels = {}
 		self._get_info_response_queue = queue.Queue()
+		self._get_button_uuid_queue = queue.Queue()
 		self._timers = queue.PriorityQueue()
 		self._handle_event_thread_ident = None
 		self._closed = False
@@ -263,6 +307,30 @@ class FlicClient:
 			
 			del self._scanners[scanner._scan_id]
 			self._send_command("CmdRemoveScanner", {"scan_id": scanner._scan_id})
+	
+	def add_scan_wizard(self, scan_wizard):
+		"""Add a ScanWizard object.
+		
+		The scan wizard will start directly once the scan wizard is added.
+		"""
+		with self._lock:
+			if scan_wizard._scan_wizard_id in self._scan_wizards:
+				return
+			
+			self._scan_wizards[scan_wizard._scan_wizard_id] = scan_wizard
+			self._send_command("CmdCreateScanWizard", {"scan_wizard_id": scan_wizard._scan_wizard_id})
+	
+	def cancel_scan_wizard(self, scan_wizard):
+		"""Cancel a ScanWizard.
+		
+		Note: The effect of this command will take place at the time the on_completed event arrives on the scan wizard object.
+		If cancelled due to this command, "result" in the on_completed event will be "WizardCancelledByUser".
+		"""
+		with self._lock:
+			if scan_wizard._scan_wizard_id not in self._scan_wizards:
+				return
+			
+			self._send_command("CmdCancelScanWizard", {"scan_wizard_id": scan_wizard._scan_wizard_id})
 	
 	def add_connection_channel(self, channel):
 		"""Adds a connection channel to a specific Flic button.
@@ -314,6 +382,20 @@ class FlicClient:
 		self._get_info_response_queue.put(callback)
 		self._send_command("CmdGetInfo", {})
 	
+	def get_button_uuid(self, bd_addr, callback):
+		"""Get button uuid for a verified button.
+		
+		The server will send back its information directly and the callback will be called once the response arrives.
+		Responses will arrive in the same order as requested.
+		
+		The callback takes two parameters: bd_addr, uuid (hex string of 32 characters).
+		
+		Note: if the button isn't verified, the uuid sent to the callback will rather be None.
+		"""
+		with self._lock:
+			self._get_button_uuid_queue.put(callback)
+			self._send_command("CmdGetButtonUUID", {"bd_addr": bd_addr})
+	
 	def set_timer(self, timeout_millis, callback):
 		"""Set a timer
 		
@@ -355,7 +437,8 @@ class FlicClient:
 		if len(data) == 0:
 			return
 		opcode = data[0]
-		if opcode >= len(FlicClient._EVENTS):
+		
+		if opcode >= len(FlicClient._EVENTS) or FlicClient._EVENTS[opcode] == None:
 			return
 		
 		event_name = FlicClient._EVENTS[opcode][0]
@@ -366,7 +449,7 @@ class FlicClient:
 		if "bd_addr" in items:
 			items["bd_addr"] = FlicClient._bdaddr_bytes_to_string(items["bd_addr"])
 		
-		if event_name == "EvtAdvertisementPacket":
+		if "name" in items:
 			items["name"] = items["name"].decode("utf-8")
 		
 		if event_name == "EvtCreateConnectionChannelResponse":
@@ -396,6 +479,14 @@ class FlicClient:
 		
 		if event_name == "EvtBluetoothControllerStateChange":
 			items["state"] = BluetoothControllerState(items["state"])
+		
+		if event_name == "EvtGetButtonUUIDResponse":
+			items["uuid"] = "".join(map(lambda x: "%02x" % x, items["uuid"]))
+			if items["uuid"] == "00000000000000000000000000000000":
+				items["uuid"] = None
+		
+		if event_name == "EvtScanWizardCompleted":
+			items["result"] = ScanWizardResult(items["result"])
 		
 		# Process event
 		if event_name == "EvtAdvertisementPacket":
@@ -445,6 +536,28 @@ class FlicClient:
 		
 		if event_name == "EvtBluetoothControllerStateChange":
 			self.on_bluetooth_controller_state_change(items["state"])
+		
+		if event_name == "EvtGetButtonUUIDResponse":
+			self._get_button_uuid_queue.get()(items["bd_addr"], items["uuid"])
+		
+		if event_name == "EvtScanWizardFoundPrivateButton":
+			scan_wizard = self._scan_wizards[items["scan_wizard_id"]]
+			scan_wizard.on_found_private_button(scan_wizard)
+		
+		if event_name == "EvtScanWizardFoundPublicButton":
+			scan_wizard = self._scan_wizards[items["scan_wizard_id"]]
+			scan_wizard._bd_addr = items["bd_addr"]
+			scan_wizard._name = items["name"]
+			scan_wizard.on_found_public_button(scan_wizard, scan_wizard._bd_addr, scan_wizard._name)
+		
+		if event_name == "EvtScanWizardButtonConnected":
+			scan_wizard = self._scan_wizards[items["scan_wizard_id"]]
+			scan_wizard.on_button_connected(scan_wizard, scan_wizard._bd_addr, scan_wizard._name)
+		
+		if event_name == "EvtScanWizardCompleted":
+			scan_wizard = self._scan_wizards[items["scan_wizard_id"]]
+			del self._scan_wizards[items["scan_wizard_id"]]
+			scan_wizard.on_completed(scan_wizard, items["result"], scan_wizard._bd_addr, scan_wizard._name)
 	
 	def _handle_one_event(self):
 		if len(self._timers.queue) > 0:
