@@ -19,15 +19,18 @@ This library is built on top of the HCI_CHANNEL_USER capability of the Linux ker
 * `client_protocol_packets.h` - C/C++ structs for all packets that can be included in a C/C++ program.
 
 ### Supported platforms
-Binaries and libraries has been compiled for x86_64 and armv6l. The minimum Linux kernel supported is 3.13. All code has been compiled and tested on Ubuntu 15.10 for desktop and Raspbian Jessy. This means it should be compatible with desktop systems and Raspberry Pi 1, 2 & 3. I have tried to make the binaries as portable as possible.
+Binaries and libraries has been compiled for x86_64, i386 and armv6l. The minimum Linux kernel supported is 3.13. All code has been compiled and tested on Ubuntu 15.10 for desktop and Raspbian Jessy. This means it should be compatible with desktop systems and Raspberry Pi 1, 2 & 3. I have tried to make the binaries as portable as possible.
 
 If you have compiled your own kernel you must make sure to include support for Bluetooth. In kernel config, enable at least Networking support -> Bluetooth subsystem support -> Bluetooth device drivers -> HCI USB driver and HCI UART driver.
 
 ### Bluetooth controllers
-All Bluetooth controllers with support for Bluetooth 4.0 and Bluetooth Low Energy (Bluetooth Smart) that have Linux support should work. We have tested compatibility with some common Bluetooth controllers. The following devices have been tested and confirmed:
+All Bluetooth controllers with support for Bluetooth 4.0 and Bluetooth Low Energy (Bluetooth Smart) that have Linux support should work. Generally small cheap USB dongles seem to have shorter range than those integrated inside computers. We have tested compatibility with some common Bluetooth controllers. The following devices have been tested and confirmed:
 
 **Plugable USB Bluetooth 4.0 Low Energy Micro Adapter / Asus USB-BT400 (Broadcom BCM20702 Bluetooth 4.0)**
 - Supports 14 concurrent connections and in total 32 pending connections.
+
+**Cambridge Silicon Radio CSR8510 A10 based controllers (Bluetooth 4.0)**
+- Supports 5 concurrent connections and in total 25 pending connections.
 
 **Raspberry Pi 3 model B (Broadcom BCM43438 Bluetooth 4.1)**
 - Supports 10 concurrent connections and in total 128 pending connections.
@@ -35,8 +38,11 @@ All Bluetooth controllers with support for Bluetooth 4.0 and Bluetooth Low Energ
 **Intel Centrino Advanced-N 6235 (Bluetooth 4.0)**
 - Supports 3 concurrent connections and in total 25 pending connections.
 
-**Cambridge Silicon Radio CSR8510 A10 based controllers (Bluetooth 4.0)**
-- Supports 5 concurrent connections and in total 25 pending connections.
+**Intel Wireless 7260 (Bluetooth 4.0)**
+- Supports 7 concurrent connections and in total 32 pending connections.
+
+**IMC Networks Atheros AR3012 Bluetooth (Bluetooth 4.0)**
+- Supports 10 concurrent connections and in total 128 pending connections. Can be a bit buggy sometimes, like dropping and duplicating BLE packets. Also sometimes "forgets" to disconnect a BLE link when instructed to. Should however work ok in most cases.
 
 ## Quick start
 ### Packages
