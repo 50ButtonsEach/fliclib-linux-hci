@@ -44,6 +44,9 @@ All Bluetooth controllers with support for Bluetooth 4.0 and Bluetooth Low Energ
 **IMC Networks Atheros AR3012 Bluetooth (Bluetooth 4.0)**
 - Supports 10 concurrent connections and in total 128 pending connections. Can be a bit buggy sometimes, like dropping and duplicating BLE packets. Also sometimes "forgets" to disconnect a BLE link when instructed to. Should however work ok in most cases.
 
+**Sena Technologies Parani-UD100-G03 (Cambridge Silicon Radio, Bluetooth 4.0)**
+- Supports 5 concurrent connections and in total 25 pending connections. This one is recommended if you need large range. Other budget bluetooth dongles seem to have very short range.
+
 ## Quick start
 ### Packages
 There are no dependencies except the standard C/C++ libraries, which should be installed by default on most Linux distributions.
