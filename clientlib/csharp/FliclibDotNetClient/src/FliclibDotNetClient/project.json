@@ -1,0 +1,12 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "FliclibDotNetClient Class Library",
+  "authors": [ "Emil" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+
+  "frameworks": {
+    "net451": { }
+  }
+}

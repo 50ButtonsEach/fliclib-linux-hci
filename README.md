@@ -15,6 +15,7 @@ This library is built on top of the HCI_CHANNEL_USER capability of the Linux ker
 * `clientlib/python` - A library for python 3.3 or higher, very similar to the Java library. Some example programs included.
 * `clientlib/websocket` - A websocket proxy and a demo client in html/javascript which you can use to scan and connect buttons.
 * `clientlib/nodejs` - A library for nodejs and examples.
+* `clientlib/csharp` - A library for C# with a GUI example that uses Windows Forms.
 * `simpleclient` - A simple command line client with source code that can be used to test the protocol.
 * `client_protocol_packets.h` - C/C++ structs for all packets that can be included in a C/C++ program.
 
@@ -45,7 +46,7 @@ All Bluetooth controllers with support for Bluetooth 4.0 and Bluetooth Low Energ
 - Supports 10 concurrent connections and in total 128 pending connections. Can be a bit buggy sometimes, like dropping and duplicating BLE packets. Also sometimes "forgets" to disconnect a BLE link when instructed to. Should however work ok in most cases.
 
 **Sena Technologies Parani-UD100-G03 (Cambridge Silicon Radio, Bluetooth 4.0)**
-- Supports 5 concurrent connections and in total 25 pending connections. This one is recommended if you need large range. Other budget bluetooth dongles seem to have very short range.
+- Supports 5 concurrent connections and in total 25 pending connections. This one is recommended if you need large range. Other budget bluetooth dongles seem to have very short range. Note that the BLE part of the Microsoft Windows driver for this controller currently does not work, in case you are using https://github.com/50ButtonsEach/fliclib-windows.
 
 ## Quick start
 ### Packages
