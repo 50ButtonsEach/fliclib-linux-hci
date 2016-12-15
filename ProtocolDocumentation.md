@@ -226,7 +226,7 @@ _enum LatencyMode_ **latency_mode**:
 Latency you are willing to accept for this connection channel.
 
 _uint16\_t_ **auto_disconnect_time**:
-Time in seconds after the Flic button may disconnect after the latest press or release. The button will reconnect automatically when it is later pressed again and deliver its enqueued events. Valid values are 0 - 511. 512 is used to disable this feature, i.e. the button will remain connected. If there are multiple connection channels for this button, the maximum value will be used.
+Time in seconds after the Flic button may disconnect after the latest press or release. The button will reconnect automatically when it is later pressed again and deliver its enqueued events. Valid values are 0 - 511. 511 is used to disable this feature, i.e. the button will remain connected. If there are multiple connection channels for this button, the maximum value will be used.
 
 
 ### CmdRemoveConnectionChannel
