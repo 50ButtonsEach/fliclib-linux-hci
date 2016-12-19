@@ -423,7 +423,7 @@ _bdaddr\_t_[nb_verified_buttons] **bd_addr_of_verified_buttons**:
 An array of all the verified buttons.
 
 ### EvtNoSpaceForNewConnection
-Sent whenever the server wants to connect another button but there is no more space.
+Sent when the maximum number of connections has been reached (immediately after the EvtConnectionStatusChanged event). If the maximum number of connections is unknown, it is sent when the maximum number of connections are reached and an attempt is made to connect yet another button.
 
 _uint8\_t_ **opcode**: 10
 
@@ -431,7 +431,7 @@ _uint8\_t_ **max_concurrently_connected_buttons**:
 Same as in EvtGetInfoResponse.
 
 ### EvtGotSpaceForNewConnection
-Sent when the maximum number of concurrent connections was reached but a button has now disconnected, making room for one new connection.
+Sent when the maximum number of concurrent connections was reached but a button has now disconnected, making room for one new connection. Now a new connection attempt will automatically be made to devices having a connection channel open but has not yet established a connection.
 
 _uint8\_t_ **opcode**: 11
 
