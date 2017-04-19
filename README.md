@@ -105,3 +105,6 @@ Documentation for the Java implementation is included as javadoc.
 
 ## Feedback
 Be sure to post a Github issue if you find a bug, something you don't like or if something is wrong or should be changed. You can also submit a Pull request if you have a ready improvement.
+
+## License
+To allow for easy integration, we have released the source code and documentation under [CC0](COPYING%20(for%20the%20documentation%20and%20source%20code).txt). The flicd binary is released under a [separate license](LICENSE%20(for%20the%20flicd%20binary).txt) which allows you to use it almost without restrictions.
