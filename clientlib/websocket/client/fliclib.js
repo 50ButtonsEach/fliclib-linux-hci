@@ -432,8 +432,8 @@ var FlicConnectionChannel = (function() {
 	
 	return function(bdAddr, options) {
 		options = options || {};
-		var latencyMode = (latencyMode in options) ? options.latencyMode : "NormalLatency";
-		var autoDisconnectTime = (autoDisconnectTime in options) ? options.autoDisconnectTime : 511;
+		var latencyMode = ("latencyMode" in options) ? options.latencyMode : "NormalLatency";
+		var autoDisconnectTime = ("autoDisconnectTime" in options) ? options.autoDisconnectTime : 511;
 		
 		var onCreateResponse = options.onCreateResponse || function(error, connectionStatus){};
 		var onRemoved = options.onRemoved || function(removedReason){};
