@@ -5,7 +5,7 @@ curl https://raw.githubusercontent.com/50ButtonsEach/fliclib-linux-hci/master/bi
 chmod a+x /usr/sbin/flicd
 
 # Download the latest init script
-#curl https://scscsc > /etc/init.d/flicd
+curl https://raw.githubusercontent.com/50ButtonsEach/fliclib-linux-hci/master/flicd.initd > /etc/init.d/flicd
 chmod a+x /etc/init.d/flicd
 
 # Disable old bluetooth daemon
