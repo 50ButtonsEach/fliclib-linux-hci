@@ -98,6 +98,7 @@ public class ButtonConnectionChannel {
             FlicClient cl = client;
             if (cl != null) {
                 CmdChangeModeParameters pkt = new CmdChangeModeParameters();
+                pkt.connId = connId;
                 pkt.latencyMode = latencyMode;
                 pkt.autoDisconnectTime = autoDisconnectTime;
                 cl.sendPacket(pkt);
@@ -120,6 +121,7 @@ public class ButtonConnectionChannel {
             FlicClient cl = client;
             if (cl != null) {
                 CmdChangeModeParameters pkt = new CmdChangeModeParameters();
+                pkt.connId = connId;
                 pkt.latencyMode = latencyMode;
                 pkt.autoDisconnectTime = autoDisconnectTime;
                 cl.sendPacket(pkt);
