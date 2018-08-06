@@ -33,8 +33,9 @@ public class FlicClient {
     private ConcurrentHashMap<Integer, ButtonScanner> scanners = new ConcurrentHashMap<>();
     private ConcurrentHashMap<Integer, ButtonConnectionChannel> connectionChannels = new ConcurrentHashMap<>();
     private ConcurrentHashMap<Integer, ScanWizard> scanWizards = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<Integer, BatteryStatusListener> batteryStatusListeners = new ConcurrentHashMap<>();
     private ConcurrentLinkedQueue<GetInfoResponseCallback> getInfoResponseCallbackQueue = new ConcurrentLinkedQueue<>();
-    private ArrayDeque<GetButtonUUIDResponseCallback> getButtonUUIDResponseCallbackQueue = new ArrayDeque<>();
+    private ArrayDeque<GetButtonInfoResponseCallback> getButtonInfoResponseCallbackQueue = new ArrayDeque<>();
 
     private volatile GeneralCallbacks generalCallbacks = new GeneralCallbacks();
 
@@ -52,6 +53,7 @@ public class FlicClient {
      */
     public FlicClient(String hostName, int port) throws UnknownHostException, IOException {
         socket = new Socket(hostName, port);
+        socket.setKeepAlive(true);
         socketInputStream = socket.getInputStream();
         socketOutputStream = socket.getOutputStream();
     }
@@ -115,18 +117,18 @@ public class FlicClient {
     }
 
     /**
-     * Get button uuid for a verified button.
+     * Get button info for a verified button.
      *
      * The server will send back its information directly and the callback will be called once the response arrives.
      * Responses will arrive in the same order as requested.
      *
-     * If the button isn't verified, the uuid sent to callback will be null.
+     * If the button isn't verified, the data sent to callback will be null.
      *
      * @param bdaddr The bluetooth address.
      * @param callback Callback for the response.
      * @throws IOException
      */
-    public void getButtonUUID(final Bdaddr bdaddr, final GetButtonUUIDResponseCallback callback) throws IOException {
+    public void getButtonInfo(final Bdaddr bdaddr, final GetButtonInfoResponseCallback callback) throws IOException {
         if (callback == null) {
             throw new IllegalArgumentException("callback is null");
         }
@@ -134,9 +136,9 @@ public class FlicClient {
         runOnHandleEventsThread(new TimerTask() {
             @Override
             public void run() throws IOException {
-                getButtonUUIDResponseCallbackQueue.add(callback);
+                getButtonInfoResponseCallbackQueue.add(callback);
 
-                CmdGetButtonUUID pkt = new CmdGetButtonUUID();
+                CmdGetButtonInfo pkt = new CmdGetButtonInfo();
                 pkt.bdaddr = bdaddr;
                 sendPacket(pkt);
             }
@@ -292,6 +294,61 @@ public class FlicClient {
 
         CmdForceDisconnect pkt = new CmdForceDisconnect();
         pkt.bdaddr = bdaddr;
+        sendPacket(pkt);
+    }
+    
+    /**
+     * Delete a button.
+     *
+     * @param bdaddr
+     * @throws IOException
+     */
+    public void deleteButton(Bdaddr bdaddr) throws IOException {
+        if (bdaddr == null) {
+            throw new IllegalArgumentException("bdaddr is null");
+        }
+
+        CmdDeleteButton pkt = new CmdDeleteButton();
+        pkt.bdaddr = bdaddr;
+        sendPacket(pkt);
+    }
+
+    /**
+     * Add a battery status listener.
+     *
+     * @param listener
+     * @throws IOException
+     */
+    public void addBatteryStatusListener(BatteryStatusListener listener) throws IOException {
+        if (listener == null) {
+            throw new IllegalArgumentException("listener is null");
+        }
+        if (batteryStatusListeners.putIfAbsent(listener.listenerId, listener) != null) {
+            throw new IllegalArgumentException("Battery status listener already added");
+        }
+
+        CmdCreateBatteryStatusListener pkt = new CmdCreateBatteryStatusListener();
+        pkt.listenerId = listener.listenerId;
+        pkt.bdaddr = listener.getBdaddr();
+        sendPacket(pkt);
+    }
+
+    /**
+     * Remove a battery status listener
+     *
+     * @param listener
+     * @throws IOException
+     */
+    public void removeBatteryStatusListener(BatteryStatusListener listener) throws IOException {
+        if (listener == null) {
+            throw new IllegalArgumentException("buttonScanner is null");
+        }
+        if (batteryStatusListeners.remove(listener.listenerId) == null) {
+            throw new IllegalArgumentException("Battery status listener was never added");
+        }
+
+        CmdRemoveBatteryStatusListener pkt = new CmdRemoveBatteryStatusListener();
+        pkt.listenerId = listener.listenerId;
         sendPacket(pkt);
     }
 
@@ -501,10 +558,10 @@ public class FlicClient {
                 }
                 break;
             }
-            case EventPacket.EVT_GET_BUTTON_UUID_RESPONSE_OPCODE: {
-                EvtGetButtonUUIDResponse pkt = new EvtGetButtonUUIDResponse();
+            case EventPacket.EVT_GET_BUTTON_INFO_RESPONSE_OPCODE: {
+                EvtGetButtonInfoResponse pkt = new EvtGetButtonInfoResponse();
                 pkt.parse(packet);
-                getButtonUUIDResponseCallbackQueue.remove().onGetButtonUUIDResponse(pkt.bdaddr, pkt.uuid);
+                getButtonInfoResponseCallbackQueue.remove().onGetButtonInfoResponse(pkt.bdaddr, pkt.uuid, pkt.color);
                 break;
             }
             case EventPacket.EVT_SCAN_WIZARD_FOUND_PRIVATE_BUTTON_OPCODE: {
@@ -547,6 +604,24 @@ public class FlicClient {
                     wizard.bdaddr = null;
                     wizard.name = null;
                     wizard.onCompleted(pkt.result, bdaddr, name);
+                }
+                break;
+            }
+            case EventPacket.EVT_BUTTON_DELETED_OPCODE: {
+                EvtButtonDeleted pkt = new EvtButtonDeleted();
+                pkt.parse(packet);
+                GeneralCallbacks gc = generalCallbacks;
+                if (gc != null) {
+                    gc.onButtonDeleted(pkt.bdaddr, pkt.deletedByThisClient);
+                }
+                break;
+            }
+            case EventPacket.EVT_BATTERY_STATUS_OPCODE: {
+                EvtBatteryStatus pkt = new EvtBatteryStatus();
+                pkt.parse(packet);
+                BatteryStatusListener listener = batteryStatusListeners.get(pkt.listenerId);
+                if (listener != null) {
+                    listener.callbacks.onBatteryStatus(listener.getBdaddr(), pkt.batteryPercentage, pkt.timestamp);
                 }
                 break;
             }

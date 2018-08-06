@@ -116,7 +116,7 @@ class CmdPing extends CommandPacket {
     }
 }
 
-class CmdGetButtonUUID extends CommandPacket {
+class CmdGetButtonInfo extends CommandPacket {
     public Bdaddr bdaddr;
 
     @Override
@@ -146,6 +146,38 @@ class CmdCancelScanWizard extends CommandPacket {
     }
 }
 
+class CmdDeleteButton extends CommandPacket {
+    public Bdaddr bdaddr;
+
+    @Override
+    protected void write(OutputStream stream) throws IOException {
+        opcode = 11;
+        StreamUtils.writeBdaddr(stream, bdaddr);
+    }
+}
+
+class CmdCreateBatteryStatusListener extends CommandPacket {
+    public int listenerId;
+    public Bdaddr bdaddr;
+
+    @Override
+    protected void write(OutputStream stream) throws IOException {
+        opcode = 12;
+        StreamUtils.writeInt32(stream, listenerId);
+        StreamUtils.writeBdaddr(stream, bdaddr);
+    }
+}
+
+class CmdRemoveBatteryStatusListener extends CommandPacket {
+    public int listenerId;
+
+    @Override
+    protected void write(OutputStream stream) throws IOException {
+        opcode = 13;
+        StreamUtils.writeInt32(stream, listenerId);
+    }
+}
+
 abstract class EventPacket {
     public static final int EVT_ADVERTISEMENT_PACKET_OPCODE = 0;
     public static final int EVT_CREATE_CONNECTION_CHANNEL_RESPONSE_OPCODE = 1;
@@ -161,11 +193,13 @@ abstract class EventPacket {
     public static final int EVT_GOT_SPACE_FOR_NEW_CONNECTION_OPCODE = 11;
     public static final int EVT_BLUETOOTH_CONTROLLER_STATE_CHANGE_OPCODE = 12;
     public static final int EVT_PING_RESPONSE_OPCODE = 13;
-    public static final int EVT_GET_BUTTON_UUID_RESPONSE_OPCODE = 14;
+    public static final int EVT_GET_BUTTON_INFO_RESPONSE_OPCODE = 14;
     public static final int EVT_SCAN_WIZARD_FOUND_PRIVATE_BUTTON_OPCODE = 15;
     public static final int EVT_SCAN_WIZARD_FOUND_PUBLIC_BUTTON_OPCODE = 16;
     public static final int EVT_SCAN_WIZARD_BUTTON_CONNECTED_OPCODE = 17;
     public static final int EVT_SCAN_WIZARD_COMPLETED_OPCODE = 18;
+    public static final int EVT_BUTTON_DELETED_OPCODE = 19;
+    public static final int EVT_BATTERY_STATUS_OPCODE = 20;
 
     public void parse(byte[] arr) {
         InputStream stream = new ByteArrayInputStream(arr);
@@ -191,15 +225,7 @@ class EvtAdvertisementPacket extends EventPacket {
     protected void parseInternal(InputStream stream) throws IOException {
         scanId = StreamUtils.getInt32(stream);
         addr = StreamUtils.getBdaddr(stream);
-        int nameLen = StreamUtils.getUInt8(stream);
-        byte[] bytes = new byte[nameLen];
-        for (int i = 0; i < nameLen; i++) {
-            bytes[i] = (byte)stream.read();
-        }
-        for (int i = nameLen; i < 16; i++) {
-            stream.skip(1);
-        }
-        name = new String(bytes, StandardCharsets.UTF_8);
+        name = StreamUtils.getString(stream, 16);
         rssi = StreamUtils.getInt8(stream);
         isPrivate = StreamUtils.getBoolean(stream);
         alreadyVerified = StreamUtils.getBoolean(stream);
@@ -321,9 +347,10 @@ class EvtBluetoothControllerStateChange extends EventPacket {
     }
 }
 
-class EvtGetButtonUUIDResponse extends EventPacket {
+class EvtGetButtonInfoResponse extends EventPacket {
     public Bdaddr bdaddr;
     public String uuid;
+    public String color;
 
     @Override
     protected void parseInternal(InputStream stream) throws IOException {
@@ -336,6 +363,10 @@ class EvtGetButtonUUIDResponse extends EventPacket {
         uuid = sb.toString();
         if (uuid.equals("00000000000000000000000000000000")) {
             uuid = null;
+        }
+        color = StreamUtils.getString(stream, 16);
+        if (color.isEmpty()) {
+            color = null;
         }
     }
 }
@@ -387,5 +418,29 @@ class EvtScanWizardCompleted extends EventPacket {
     protected void parseInternal(InputStream stream) throws IOException {
         scanWizardId = StreamUtils.getInt32(stream);
         result = ScanWizardResult.values()[StreamUtils.getUInt8(stream)];
+    }
+}
+
+class EvtButtonDeleted extends EventPacket {
+    public Bdaddr bdaddr;
+    public boolean deletedByThisClient;
+
+    @Override
+    protected void parseInternal(InputStream stream) throws IOException {
+        bdaddr = StreamUtils.getBdaddr(stream);
+        deletedByThisClient = StreamUtils.getBoolean(stream);
+    }
+}
+
+class EvtBatteryStatus extends EventPacket {
+    public int listenerId;
+    public int batteryPercentage;
+    public long timestamp;
+
+    @Override
+    protected void parseInternal(InputStream stream) throws IOException {
+        listenerId = StreamUtils.getInt32(stream);
+        batteryPercentage = StreamUtils.getInt8(stream);
+        timestamp = StreamUtils.getInt64(stream);
     }
 }

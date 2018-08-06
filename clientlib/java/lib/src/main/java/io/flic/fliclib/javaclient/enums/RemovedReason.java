@@ -13,5 +13,10 @@ public enum RemovedReason {
     InternetBackendError,
     InvalidData,
     
-    CouldntLoadDevice
+    CouldntLoadDevice,
+    
+    DeletedByThisClient,
+    DeletedByOtherClient,
+    
+    ButtonBelongsToOtherPartner
 }

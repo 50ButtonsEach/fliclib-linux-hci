@@ -47,6 +47,11 @@ class RemovedReason(Enum):
 	InvalidData = 6
 	
 	CouldntLoadDevice = 7
+	
+	DeletedByThisClient = 8
+	DeletedByOtherClient = 9
+	
+	ButtonBelongsToOtherPartner = 10
 
 class ClickType(Enum):
 	ButtonDown = 0
@@ -78,6 +83,7 @@ class ScanWizardResult(Enum):
 	WizardBluetoothUnavailable = 4
 	WizardInternetBackendError = 5
 	WizardInvalidData = 6
+	WizardButtonBelongsToOtherPartner = 7
 
 class ButtonScanner:
 	"""ButtonScanner class.
@@ -116,6 +122,26 @@ class ScanWizard:
 		self.on_found_public_button = lambda scan_wizard, bd_addr, name: None
 		self.on_button_connected = lambda scan_wizard, bd_addr, name: None
 		self.on_completed = lambda scan_wizard, result, bd_addr, name: None
+
+class BatteryStatusListener:
+	"""BatteryStatusListener class
+	
+	Usage:
+	listener = BatteryStatusListener(bd_addr)
+	listener.on_battery_status = lambda battery_status_listener, bd_addr, battery_percentage, timestamp: ...
+	client.add_battery_status_listener(listener)
+	"""
+	
+	_cnt = itertools.count()
+	
+	def __init__(self, bd_addr):
+		self._listener_id = next(BatteryStatusListener._cnt)
+		self._bd_addr = bd_addr
+		self.on_battery_status = lambda battery_status_listener, battery_percentage, timestamp: None
+	
+	@property
+	def bd_addr(self):
+		return self._bd_addr
 
 class ButtonConnectionChannel:
 	"""ButtonConnectionChannel class.
@@ -200,6 +226,7 @@ class FlicClient:
 	
 	The ButtonScanner is used to set up a handler for advertisement packets.
 	The ButtonConnectionChannel is used to interact with connections to flic buttons and receive their events.
+	The BatteryStatusListener is used to get battery level.
 	
 	Other events are handled by the following callback functions that can be assigned to this object (and a list of the callback function parameters):
 	on_new_verified_button: bd_addr
@@ -223,11 +250,13 @@ class FlicClient:
 		("EvtGotSpaceForNewConnection", "<B", "max_concurrently_connected_buttons"),
 		("EvtBluetoothControllerStateChange", "<B", "state"),
 		("EvtPingResponse", "<I", "ping_id"),
-		("EvtGetButtonUUIDResponse", "<6s16s", "bd_addr uuid"),
+		("EvtGetButtonInfoResponse", "<6s16s17p", "bd_addr uuid color"),
 		("EvtScanWizardFoundPrivateButton", "<I", "scan_wizard_id"),
 		("EvtScanWizardFoundPublicButton", "<I6s17p", "scan_wizard_id bd_addr name"),
 		("EvtScanWizardButtonConnected", "<I", "scan_wizard_id"),
-		("EvtScanWizardCompleted", "<IB", "scan_wizard_id result")
+		("EvtScanWizardCompleted", "<IB", "scan_wizard_id result"),
+		("EvtButtonDeleted", "<6s?", "bd_addr deleted_by_this_client"),
+		("EvtBatteryStatus", "<Ibq", "listener_id battery_percentage timestamp")
 	]
 	_EVENT_STRUCTS = list(map(lambda x: None if x == None else struct.Struct(x[1]), _EVENTS))
 	_EVENT_NAMED_TUPLES = list(map(lambda x: None if x == None else namedtuple(x[0], x[2]), _EVENTS))
@@ -241,9 +270,12 @@ class FlicClient:
 		("CmdForceDisconnect", "<6s", "bd_addr"),
 		("CmdChangeModeParameters", "<IBh", "conn_id latency_mode auto_disconnect_time"),
 		("CmdPing", "<I", "ping_id"),
-		("CmdGetButtonUUID", "<6s", "bd_addr"),
+		("CmdGetButtonInfo", "<6s", "bd_addr"),
 		("CmdCreateScanWizard", "<I", "scan_wizard_id"),
-		("CmdCancelScanWizard", "<I", "scan_wizard_id")
+		("CmdCancelScanWizard", "<I", "scan_wizard_id"),
+		("CmdDeleteButton", "<6s", "bd_addr"),
+		("CmdCreateBatteryStatusListener", "<I6s", "listener_id bd_addr"),
+		("CmdRemoveBatteryStatusListener", "<I", "listener_id")
 	]
 	
 	_COMMAND_STRUCTS = list(map(lambda x: struct.Struct(x[1]), _COMMANDS))
@@ -262,8 +294,9 @@ class FlicClient:
 		self._scanners = {}
 		self._scan_wizards = {}
 		self._connection_channels = {}
+		self._battery_status_listeners = {}
 		self._get_info_response_queue = queue.Queue()
-		self._get_button_uuid_queue = queue.Queue()
+		self._get_button_info_queue = queue.Queue()
 		self._timers = queue.PriorityQueue()
 		self._handle_event_thread_ident = None
 		self._closed = False
@@ -272,6 +305,7 @@ class FlicClient:
 		self.on_no_space_for_new_connection = lambda max_concurrently_connected_buttons: None
 		self.on_got_space_for_new_connection = lambda max_concurrently_connected_buttons: None
 		self.on_bluetooth_controller_state_change = lambda state: None
+		self.on_button_deleted = lambda bd_addr, deleted_by_this_client: None
 	
 	def close(self):
 		"""Closes the client. The handle_events() method will return."""
@@ -364,6 +398,26 @@ class FlicClient:
 			
 			self._send_command("CmdRemoveConnectionChannel", {"conn_id": channel._conn_id})
 	
+	def add_battery_status_listener(self, listener):
+		"""Adds a battery status listener for a specific Flic button.
+		"""
+		with self._lock:
+			if listener._listener_id in self._battery_status_listeners:
+				return
+			
+			self._battery_status_listeners[listener._listener_id] = listener
+			self._send_command("CmdCreateBatteryStatusListener", {"listener_id": listener._listener_id, "bd_addr": listener._bd_addr})
+	
+	def remove_battery_status_listener(self, listener):
+		"""Remove a battery status listener.
+		"""
+		with self._lock:
+			if listener._listener_id not in self._battery_status_listeners:
+				return
+			
+			del self._battery_status_listeners[listener._listener_id]
+			self._send_command("CmdRemoveBatteryStatusListener", {"listener_id": listener._listener_id})
+	
 	def force_disconnect(self, bd_addr):
 		"""Force disconnection or cancel pending connection of a specific Flic button.
 		
@@ -382,19 +436,24 @@ class FlicClient:
 		self._get_info_response_queue.put(callback)
 		self._send_command("CmdGetInfo", {})
 	
-	def get_button_uuid(self, bd_addr, callback):
-		"""Get button uuid for a verified button.
+	def delete_button(self, bd_addr):
+		"""Delete a verified button.
+		"""
+		self._send_command("CmdDeleteButton", {"bd_addr": bd_addr})
+	
+	def get_button_info(self, bd_addr, callback):
+		"""Get button info for a verified button.
 		
 		The server will send back its information directly and the callback will be called once the response arrives.
 		Responses will arrive in the same order as requested.
 		
-		The callback takes two parameters: bd_addr, uuid (hex string of 32 characters).
+		The callback takes three parameters: bd_addr, uuid (hex string of 32 characters), color (string and None if unknown).
 		
 		Note: if the button isn't verified, the uuid sent to the callback will rather be None.
 		"""
 		with self._lock:
-			self._get_button_uuid_queue.put(callback)
-			self._send_command("CmdGetButtonUUID", {"bd_addr": bd_addr})
+			self._get_button_info_queue.put(callback)
+			self._send_command("CmdGetButtonInfo", {"bd_addr": bd_addr})
 	
 	def set_timer(self, timeout_millis, callback):
 		"""Set a timer
@@ -463,7 +522,7 @@ class FlicClient:
 		if event_name == "EvtConnectionChannelRemoved":
 			items["removed_reason"] = RemovedReason(items["removed_reason"])
 		
-		if event_name.startswith("EvtButton"):
+		if event_name == "EvtButtonUpOrDown" or event_name == "EvtButtonClickOrHold" or event_name == "EvtButtonSingleOrDoubleClick" or event_name == "EvtButtonSingleOrDoubleClickOrHold":
 			items["click_type"] = ClickType(items["click_type"])
 		
 		if event_name == "EvtGetInfoResponse":
@@ -480,10 +539,13 @@ class FlicClient:
 		if event_name == "EvtBluetoothControllerStateChange":
 			items["state"] = BluetoothControllerState(items["state"])
 		
-		if event_name == "EvtGetButtonUUIDResponse":
+		if event_name == "EvtGetButtonInfoResponse":
 			items["uuid"] = "".join(map(lambda x: "%02x" % x, items["uuid"]))
 			if items["uuid"] == "00000000000000000000000000000000":
 				items["uuid"] = None
+			items["color"] = items["color"].decode("utf-8")
+			if (items["color"] == ""):
+				items["color"] = None
 		
 		if event_name == "EvtScanWizardCompleted":
 			items["result"] = ScanWizardResult(items["result"])
@@ -537,8 +599,8 @@ class FlicClient:
 		if event_name == "EvtBluetoothControllerStateChange":
 			self.on_bluetooth_controller_state_change(items["state"])
 		
-		if event_name == "EvtGetButtonUUIDResponse":
-			self._get_button_uuid_queue.get()(items["bd_addr"], items["uuid"])
+		if event_name == "EvtGetButtonInfoResponse":
+			self._get_button_info_queue.get()(items["bd_addr"], items["uuid"], items["color"])
 		
 		if event_name == "EvtScanWizardFoundPrivateButton":
 			scan_wizard = self._scan_wizards[items["scan_wizard_id"]]
@@ -558,6 +620,14 @@ class FlicClient:
 			scan_wizard = self._scan_wizards[items["scan_wizard_id"]]
 			del self._scan_wizards[items["scan_wizard_id"]]
 			scan_wizard.on_completed(scan_wizard, items["result"], scan_wizard._bd_addr, scan_wizard._name)
+		
+		if event_name == "EvtButtonDeleted":
+			self.on_button_deleted(items["bd_addr"], items["deleted_by_this_client"])
+		
+		if event_name == "EvtBatteryStatus":
+			listener = self._battery_status_listeners.get(items["listener_id"])
+			if listener is not None:
+				listener.on_battery_status(listener, items["battery_percentage"], items["timestamp"])
 	
 	def _handle_one_event(self):
 		if len(self._timers.queue) > 0:

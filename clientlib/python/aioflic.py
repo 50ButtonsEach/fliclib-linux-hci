@@ -43,6 +43,11 @@ class RemovedReason(Enum):
     InvalidData = 6
     
     CouldntLoadDevice = 7
+    
+    DeletedByThisClient = 8
+    DeletedByOtherClient = 9
+    
+    ButtonBelongsToOtherPartner = 10
 
 class ClickType(Enum):
     ButtonDown = 0
@@ -74,6 +79,7 @@ class ScanWizardResult(Enum):
     WizardBluetoothUnavailable = 4
     WizardInternetBackendError = 5
     WizardInvalidData = 6
+    WizardButtonBelongsToOtherPartner = 7
 
 class ButtonScanner:
     """ButtonScanner class.
@@ -112,6 +118,26 @@ class ScanWizard:
         self.on_found_public_button = lambda scan_wizard, bd_addr, name: None
         self.on_button_connected = lambda scan_wizard, bd_addr, name: None
         self.on_completed = lambda scan_wizard, result, bd_addr, name: None
+
+class BatteryStatusListener:
+    """BatteryStatusListener class
+    
+    Usage:
+    listener = BatteryStatusListener(bd_addr)
+    listener.on_battery_status = lambda battery_status_listener, bd_addr, battery_percentage, timestamp: ...
+    client.add_battery_status_listener(listener)
+    """
+    
+    _cnt = itertools.count()
+    
+    def __init__(self, bd_addr):
+        self._listener_id = next(BatteryStatusListener._cnt)
+        self._bd_addr = bd_addr
+        self.on_battery_status = lambda battery_status_listener, battery_percentage, timestamp: None
+    
+    @property
+    def bd_addr(self):
+        return self._bd_addr
 
 class ButtonConnectionChannel:
     """ButtonConnectionChannel class.
@@ -217,11 +243,13 @@ class FlicClient(asyncio.Protocol):
         ("EvtGotSpaceForNewConnection", "<B", "max_concurrently_connected_buttons"),
         ("EvtBluetoothControllerStateChange", "<B", "state"),
         ("EvtPingResponse", "<I", "ping_id"),
-        ("EvtGetButtonUUIDResponse", "<6s16s", "bd_addr uuid"),
+        ("EvtGetButtonInfoResponse", "<6s16s17p", "bd_addr uuid color"),
         ("EvtScanWizardFoundPrivateButton", "<I", "scan_wizard_id"),
         ("EvtScanWizardFoundPublicButton", "<I6s17p", "scan_wizard_id bd_addr name"),
         ("EvtScanWizardButtonConnected", "<I", "scan_wizard_id"),
-        ("EvtScanWizardCompleted", "<IB", "scan_wizard_id result")
+        ("EvtScanWizardCompleted", "<IB", "scan_wizard_id result"),
+        ("EvtButtonDeleted", "<6s?", "bd_addr deleted_by_this_client"),
+        ("EvtBatteryStatus", "<Ibq", "listener_id battery_percentage timestamp")
     ]
     _EVENT_STRUCTS = list(map(lambda x: None if x == None else struct.Struct(x[1]), _EVENTS))
     _EVENT_NAMED_TUPLES = list(map(lambda x: None if x == None else namedtuple(x[0], x[2]), _EVENTS))
@@ -235,9 +263,12 @@ class FlicClient(asyncio.Protocol):
         ("CmdForceDisconnect", "<6s", "bd_addr"),
         ("CmdChangeModeParameters", "<IBh", "conn_id latency_mode auto_disconnect_time"),
         ("CmdPing", "<I", "ping_id"),
-        ("CmdGetButtonUUID", "<6s", "bd_addr"),
+        ("CmdGetButtonInfo", "<6s", "bd_addr"),
         ("CmdCreateScanWizard", "<I", "scan_wizard_id"),
-        ("CmdCancelScanWizard", "<I", "scan_wizard_id")
+        ("CmdCancelScanWizard", "<I", "scan_wizard_id"),
+        ("CmdDeleteButton", "<6s", "bd_addr"),
+        ("CmdCreateBatteryStatusListener", "<I6s", "listener_id bd_addr"),
+        ("CmdRemoveBatteryStatusListener", "<I", "listener_id")
     ]
     
     _COMMAND_STRUCTS = list(map(lambda x: struct.Struct(x[1]), _COMMANDS))
@@ -259,6 +290,7 @@ class FlicClient(asyncio.Protocol):
         self._scanners = {}
         self._scan_wizards = {}
         self._connection_channels = {}
+        self._battery_status_listeners = {}
         self._closed = False
         
         self.on_new_verified_button = lambda bd_addr: None
@@ -267,6 +299,7 @@ class FlicClient(asyncio.Protocol):
         self.on_bluetooth_controller_state_change = lambda state: None    
         self.on_get_info = lambda items: None
         self.on_get_button_uuid = lambda addr, uuid: None
+        self.on_button_deleted = lambda bd_addr, deleted_by_this_client: None
          
     def connection_made(self, transport):
         self.transport=transport
@@ -354,6 +387,24 @@ class FlicClient(asyncio.Protocol):
             return
         
         self._send_command("CmdRemoveConnectionChannel", {"conn_id": channel._conn_id})
+    
+    def add_battery_status_listener(self, listener):
+        """Adds a battery status listener for a specific Flic button.
+        """
+        if listener._listener_id in self._battery_status_listeners:
+            return
+        
+        self._battery_status_listeners[listener._listener_id] = listener
+        self._send_command("CmdCreateBatteryStatusListener", {"listener_id": listener._listener_id, "bd_addr": listener._bd_addr})
+    
+    def remove_battery_status_listener(self, listener):
+        """Remove a battery status listener.
+        """
+        if listener._listener_id not in self._battery_status_listeners:
+            return
+        
+        del self._battery_status_listeners[listener._listener_id]
+        self._send_command("CmdRemoveBatteryStatusListener", {"listener_id": listener._listener_id})
     
     def force_disconnect(self, bd_addr):
         """Force disconnection or cancel pending connection of a specific Flic button.

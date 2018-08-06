@@ -34,9 +34,11 @@ Summary
     * [CmdForceDisconnect](#cmdforcedisconnect)
     * [CmdChangeModeParameters](#cmdchangemodeparameters)
     * [CmdPing](#cmdping)
-    * [CmdGetButtonUUID](#cmdgetbuttonuuid)
+    * [CmdGetButtonInfo](#cmdgetbuttoninfo)
     * [CmdCreateScanWizard](#cmdcreatescanwizard)
     * [CmdCancelScanWizard](#cmdcancelscanwizard)
+    * [CmdDeleteButton](#cmddeletebutton)
+    * [CmdCreateBatteryStatusListener](#cmdcreatebatterystatuslistener)
   * [Events](#events)
     * [EvtAdvertisementPacket](#evtadvertisementpacket)
     * [EvtCreateConnectionChannelResponse](#evtcreateconnectionchannelresponse)
@@ -49,11 +51,13 @@ Summary
     * [EvtGotSpaceForNewConnection](#evtgotspacefornewconnection)
     * [EvtBluetoothControllerStateChange](#evtbluetoothcontrollerstatechange)
     * [EvtPingResponse](#evtpingresponse)
-    * [EvtGetButtonUUIDResponse](#evtgetbuttonuuidresponse)
+    * [EvtGetButtonInfoResponse](#evtgetbuttoninforesponse)
     * [EvtScanWizardFoundPrivateButton](#evtscanwizardfoundprivatebutton)
     * [EvtScanWizardFoundPublicButton](#evtscanwizardfoundpublicbutton)
     * [EvtScanWizardButtonConnected](#evtscanwizardbuttonconnected)
     * [EvtScanWizardCompleted](#evtscanwizardcompleted)
+    * [EvtButtonDeleted](#evtbuttondeleted)
+    * [EvtBatteryStatus](#evtbatterystatus)
 
 Enums
 -----
@@ -97,7 +101,7 @@ The connection channel was removed due to a force disconnect by this client.
 **ForceDisconnectedByOtherClient** -
 Another client force disconnected the button used in this connection channel.
 
-The following reasons might only happen if the Flic button is previously not verified, i.e. these are errors that might happen during the bonding process.
+The next four reasons might only happen if the Flic button is previously not verified, i.e. these are errors that might happen during the bonding process.
 
 **ButtonIsPrivate** -
 The button is not in public mode. Hold it down for 7 seconds while not trying to establish a connection, then try to reconnect by creating a new connection channel.
@@ -110,6 +114,22 @@ The internet request to the Flic backend failed.
 
 **InvalidData** -
 According to the Flic backend, this Flic button supplied invalid identity data.
+
+The next reason may only occur on Windows (i.e. the Windows daemon is used).
+
+**CouldntLoadDevice**
+The file representing the Flic Bluetooth device could not be opened, or it is reporting invalid status. If this happens, manually unpair the device in Windows's Bluetooth settings.
+
+The next two reasons might only happen if the Flic button is previously verified.
+
+**DeletedByThisClient** -
+The button was deleted by this client by a call to CmdDeleteButton.
+
+**DeletedByOtherClient** -
+The button was deleted by another client by a call to CmdDeleteButton.
+
+**ButtonBelongsToOtherPartner** -
+The button belongs to another PbF partner.
 
 ### ClickType
 **ButtonDown** -
@@ -184,6 +204,9 @@ The internet request to the Flic backend failed.
 
 **WizardInvalidData** -
 According to the Flic backend, this Flic button supplied invalid identity data.
+
+**WizardButtonBelongsToOtherPartner** -
+The button belongs to another PbF partner.
 
 Commands
 --------
@@ -262,34 +285,62 @@ See under CmdCreateConnectionChannel.
 ### CmdPing
 If you for various reasons would like to ping the server, send this command. An EvtPingResponse will be sent back in return with the same ping_id.
 
-_uint8\_t_: **opcode**: 7
+_uint8\_t_ **opcode**: 7
 
-_uint32\_t_: **ping_id**:
+_uint32\_t_ **ping_id**:
 An identifier that will be sent back in return.
 
-### CmdGetButtonUUID
-Get the 128-bit identifier for a verified button. Each button has a unique identifier. An EvtGetButtonUUIDResponse will be sent back immediately in return with the bd\_addr field set to the same value as in the request. The uuid will be filled in as well. If the button with the given bluetooth address is not verified, the uuid will be all zeros.
+### CmdGetButtonInfo
+Get info about a verified button. An EvtGetButtonInfoResponse will be sent back immediately in return with the bd\_addr field set to the same value as in the request.
 
-_uint8\_t_: **opcode**: 8
+_uint8\_t_ **opcode**: 8
 
-_bdaddr\_t_: **bd_addr**:
+_bdaddr\_t_ **bd_addr**:
 Bluetooth device address of the button to look up.
 
 ### CmdCreateScanWizard
 Starts a scan wizard. If there already exists a scan wizard with the same id, this does nothing.
 
-_uint8\_t_: **opcode**: 9
+_uint8\_t_ **opcode**: 9
 
-_uint32\_t_: **scan_wizard_id**:
+_uint32\_t_ **scan_wizard_id**:
 A unique identifier.
 
 ### CmdCancelScanWizard
-Cancel a scan wizard that was previously started. If there exists a scan wizard with this id, it is cancelled and an EvtScanWizardCompleted is sent with the reason set to WizardCancelledByUser.
+Cancels a scan wizard that was previously started. If there exists a scan wizard with this id, it is cancelled and an EvtScanWizardCompleted is sent with the reason set to WizardCancelledByUser.
 
-_uint\_t_: **opcode**: 10
+_uint8\_t_ **opcode**: 10
 
-_uint32\_t_: **scan_wizard_id**:
+_uint32\_t_ **scan_wizard_id**:
 The identifier that was given when the scan wizard was started.
+
+### CmdDeleteButton
+Deletes a button. If the button exists in the list of verified buttons, all connection channels will be removed for all clients for this button. After that the EvtButtonDeleted event will be triggered for all clients. If the button does not exist in the list of verified buttons, the request has no effects but an EvtButtonDeleted will be triggered anyway for this client with the same address as in the request.
+
+_uint8\_t_ **opcode**: 11
+
+_bdaddr\_t_ **address**:
+The Bluetooth device address of the button being deleted.
+
+## CmdCreateBatteryStatusListener
+Creates a battery status listener for a specific button. If the given listener\_id already exists for this client, this does nothing. Once created, an EvtBatteryStatus will always immediately be sent with the current battery status. Every time the battery status later updates, an EvtBatteryStatus will be sent. This will usually happen not more often than every three hours. Note that by just having a battery status listener doesn't mean flicd will automatically connect to a Flic button in order to get updates. At least one client needs a connection channel for the particular button to be able to get new updates.
+
+_uint8\_t_ **opcode**: 12
+
+_uint32\_t_ **listener_id**:
+Listener identifier.
+
+_bdaddr\_t_ **address**:
+The Bluetooth device address of the button being monitored.
+
+## CmdRemoveBatteryStatusListener
+Removes a battery status listener.
+
+_uint8\_t_ **opcode**: 13
+
+_uint32\_t_ **listener_id**:
+Listener identifier.
+
 
 Events
 ------
@@ -449,39 +500,47 @@ The new state.
 ### EvtPingResponse
 Sent in response to a CmdPing
 
-_uint8\_t_: **opcode**: 13
+_uint8\_t_ **opcode**: 13
 
-_uint32\_t_: **ping_id**:
+_uint32\_t_ **ping_id**:
 Same ping id as sent in the CmdPing.
 
-### EvtGetButtonUUIDResponse
-Sent in return to a CmdGetButtonUUID.
+### EvtGetButtonInfoResponse
+Sent in return to a CmdGetButtonInfo. If the button was not verified, all parameters except bd_addr will contain zero-bytes.
 
-_uint8\_t_: **opcode**: 14
+_uint8\_t_ **opcode**: 14
 
-_bdaddr\_t_: **bd_addr**:
+_bdaddr\_t_ **bd_addr**:
 The bluetooth device address of the request.
 
-_uint8\_t[16]_: **uuid**:
-The uuid if the button with the given bluetooth address was found and verified. Otherwise all zeros.
+_uint8\_t[16]_ **uuid**:
+The uuid of the button. Each button has a unique 128-bit identifier.
+
+_uint8\_t_ **color_length**:
+The length in bytes of the color following.
+
+_char[16]_ **color**:
+The first _color\_length_ bytes of this array contain the UTF-8 encoding of the color. The other bytes will be zeros.
+Currently the following strings are defined: `black`, `white`, `turquoise`, `green` and `yellow` but more colors may be added later, so don't expect these are the only possible values.
+
 
 ### EvtScanWizardFoundPrivateButton
-Sent once if a private button is found during the scan. If this is received, tell the user to hold the button down for 7 seconds.
+Sent once if a previously not verified private button is found during the scan. If this is received, tell the user to hold the button down for 7 seconds.
 
-_uint8\_t_: **opcode**: 15
+_uint8\_t_ **opcode**: 15
 
-_uint32\_t_: **scan_wizard_id**:
+_uint32\_t_ **scan_wizard_id**:
 Scan wizard id.
 
 ### EvtScanWizardFoundPublicButton
-Sent once if a public button is found during scan. Now the scan wizard stops scanning internally and instead initiates a connection to this button.
+Sent once if a previously not verified public button is found during scan. Now the scan wizard stops scanning internally and instead initiates a connection to this button.
 
-_uint8\_t_: **opcode**: 16
+_uint8\_t_ **opcode**: 16
 
-_uint32\_t_: **scan_wizard_id**:
+_uint32\_t_ **scan_wizard_id**:
 Scan wizard id.
 
-_bdaddr\_t_: **bd_addr**:
+_bdaddr\_t_ **bd_addr**:
 The bluetooth address of the Flic button that was found.
 
 _uint8\_t_ **name_length**:
@@ -493,18 +552,43 @@ The first _name\_length_ bytes of this array contain the UTF-8 encoding of the a
 ### EvtScanWizardButtonConnected
 Sent when the found button connects for the first time. Now the verification and pairing process will begin.
 
-_uint8\_t_: **opcode**: 17
+_uint8\_t_ **opcode**: 17
 
-_uint32\_t_: **scan_wizard_id**:
+_uint32\_t_ **scan_wizard_id**:
 Scan wizard id.
 
 ### EvtScanWizardCompleted
 Sent when the scan wizard has completed. See ScanWizardResult documentation for more information.
 
-_uint8\_t_: **opcode**: 18
+_uint8\_t_ **opcode**: 18
 
-_uint32\_t_: **scan_wizard_id**:
+_uint32\_t_ **scan_wizard_id**:
 Scan wizard id.
 
-_enum ScanWizardResult_: **result**:
+_enum ScanWizardResult_ **result**:
 Result of the scan wizard.
+
+### EvtButtonDeleted
+Sent as a response to CmdDeleteButton or when a verified button has been deleted from the database.
+
+_uint8\_t_ **opcode**: 19
+
+_bdaddr\_t_ **bd_addr**:
+The bluetooth device address of the deleted button.
+
+_bool_ **deleted_by_this_client**:
+Whether or not the client that initiated the deletion was the current client.
+
+### EvtBatteryStatus
+Sent to a battery status listener created by CmdCreateBatteryStatusListener in order to indicate the current battery status.
+
+_uint8\_t_ **opcode**: 20
+
+_uint32\_t_ **listener_id**:
+Listener identifier.
+
+_int8\_t_ **battery_percentage**:
+A value between 0 and 100 that indicates the current battery status. The value can also be -1 if unknown.
+
+_int64\_t_ **timestamp**:
+UNIX timestamp (time in seconds since 1970-01-01T00:00:00Z, excluding leap seconds).

@@ -22,4 +22,7 @@ public class GeneralCallbacks {
     public void onBluetoothControllerStateChange(BluetoothControllerState state) throws IOException {
 
     }
+    public void onButtonDeleted(Bdaddr bdaddr, boolean deletedByThisClient) throws IOException {
+
+    }
 }

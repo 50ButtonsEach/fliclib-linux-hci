@@ -51,7 +51,12 @@ static const char* RemovedReasonStrings[] = {
 	"InternetBackendError",
 	"InvalidData",
 	
-	"CouldntLoadDevice"
+	"CouldntLoadDevice",
+	
+	"DeletedByThisClient",
+	"DeletedByOtherClient",
+	
+	"ButtonBelongsToOtherPartner"
 };
 
 static const char* ClickTypeStrings[] = {
@@ -81,7 +86,8 @@ static const char* ScanWizardResultStrings[] = {
 	"WizardButtonIsPrivate",
 	"WizardBluetoothUnavailable",
 	"WizardInternetBackendError",
-	"WizardInvalidData"
+	"WizardInvalidData",
+	"WizardButtonBelongsToOtherPartner"
 };
 
 static const char* BluetoothControllerStateStrings[] = {
@@ -204,7 +210,9 @@ static void print_help() {
 	"disconnect id - disconnect or abort pending connection\n"
 	"changeModeParameters id latency_mode auto_disconnect_time - change latency mode (NormalLatency/LowLatency/HighLatency) and auto disconnect time for this connection\n"
 	"forceDisconnect xx:xx:xx:xx:xx:xx - disconnect this button, even if other client program are connected\n"
-	"getButtonUUID xx:xx:xx:xx:xx:xx - get button uuid for a verified button\n"
+	"getButtonInfo xx:xx:xx:xx:xx:xx - get button info for a verified button\n"
+	"createBatteryStatusListener xx:xx:xx:xx:xx:xx id - first parameter is the bluetooth address of the button, second is an integer you set to identify this listener\n"
+	"removeBatteryStatusListener id - removes a battery listener\n"
 	"help - prints this help text\n"
 	"\n";
 	fprintf(stderr, help_text);
@@ -329,15 +337,28 @@ int main(int argc, char* argv[]) {
 				cmd.auto_disconnect_time = auto_disconnect_time;
 				write_packet(sockfd, &cmd, sizeof(cmd));
 			}
-			if (strcmp("getButtonUUID", cmd) == 0) {
-				CmdGetButtonUUID cmd;
-				cmd.opcode = CMD_GET_BUTTON_UUID_OPCODE;
+			if (strcmp("getButtonInfo", cmd) == 0) {
+				CmdGetButtonInfo cmd;
+				cmd.opcode = CMD_GET_BUTTON_INFO_OPCODE;
 				memcpy(cmd.bd_addr, read_bdaddr().addr, 6);
 				write_packet(sockfd, &cmd, sizeof(cmd));
 			}
 			if (strcmp("getInfo", cmd) == 0) {
 				CmdGetInfo cmd;
 				cmd.opcode = CMD_GET_INFO_OPCODE;
+				write_packet(sockfd, &cmd, sizeof(cmd));
+			}
+			if (strcmp("createBatteryStatusListener", cmd) == 0) {
+				CmdCreateBatteryStatusListener cmd;
+				cmd.opcode = CMD_CREATE_BATTERY_STATUS_LISTENER_OPCODE;
+				memcpy(cmd.bd_addr, read_bdaddr().addr, 6);
+				scanf("%u", &cmd.listener_id);
+				write_packet(sockfd, &cmd, sizeof(cmd));
+			}
+			if (strcmp("removeBatteryStatusListener", cmd) == 0) {
+				CmdRemoveBatteryStatusListener cmd;
+				cmd.opcode = CMD_REMOVE_BATTERY_STATUS_LISTENER_OPCODE;
+				scanf("%u", &cmd.listener_id);
 				write_packet(sockfd, &cmd, sizeof(cmd));
 			}
 			if (strcmp("help", cmd) == 0) {
@@ -447,9 +468,9 @@ int main(int argc, char* argv[]) {
 					printf("Bluetooth state change: %d\n", evt->state);
 					break;
 				}
-				case EVT_GET_BUTTON_UUID_RESPONSE_OPCODE: {
-					EvtGetButtonUUIDResponse* evt = (EvtGetButtonUUIDResponse*)pkt;
-					printf("Button UUID response: %s %s\n", Bdaddr(evt->bd_addr).to_string().c_str(), bytes_to_hex_string(evt->uuid, sizeof(evt->uuid)).c_str());
+				case EVT_GET_BUTTON_INFO_RESPONSE_OPCODE: {
+					EvtGetButtonInfoResponse* evt = (EvtGetButtonInfoResponse*)pkt;
+					printf("Button info response: %s %s %s\n", Bdaddr(evt->bd_addr).to_string().c_str(), bytes_to_hex_string(evt->uuid, sizeof(evt->uuid)).c_str(), string(evt->color, (size_t)evt->color_length).c_str());
 					break;
 				}
 				case EVT_SCAN_WIZARD_FOUND_PRIVATE_BUTTON_OPCODE: {
@@ -468,6 +489,11 @@ int main(int argc, char* argv[]) {
 				case EVT_SCAN_WIZARD_COMPLETED_OPCODE: {
 					EvtScanWizardCompleted* evt = (EvtScanWizardCompleted*)pkt;
 					printf("Scan wizard done with status %s\n", ScanWizardResultStrings[evt->result]);
+					break;
+				}
+				case EVT_BATTERY_STATUS_OPCODE: {
+					EvtBatteryStatus* evt = (EvtBatteryStatus*)pkt;
+					printf("Battery status report for id %d, percentage: %d%%, timestamp: %s\n", evt->listener_id, evt->battery_percentage, ctime((time_t*)&evt->timestamp));
 					break;
 				}
 			}

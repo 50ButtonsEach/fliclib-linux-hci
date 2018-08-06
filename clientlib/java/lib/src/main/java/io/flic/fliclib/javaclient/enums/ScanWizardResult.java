@@ -7,5 +7,6 @@ public enum ScanWizardResult {
     WizardButtonIsPrivate,
     WizardBluetoothUnavailable,
     WizardInternetBackendError,
-    WizardInvalidData
+    WizardInvalidData,
+    WizardButtonBelongsToOtherPartner
 }

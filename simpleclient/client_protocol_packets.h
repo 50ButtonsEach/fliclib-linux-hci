@@ -46,7 +46,14 @@ enum RemovedReason {
 	ButtonIsPrivate,
 	VerifyTimeout,
 	InternetBackendError,
-	InvalidData
+	InvalidData,
+	
+	CouldntLoadDevice,
+	
+	DeletedByThisClient,
+	DeletedByOtherClient,
+	
+	ButtonBelongsToOtherPartner
 } PACKED;
 
 enum ClickType {
@@ -76,7 +83,8 @@ enum ScanWizardResult {
 	WizardButtonIsPrivate,
 	WizardBluetoothUnavailable,
 	WizardInternetBackendError,
-	WizardInvalidData
+	WizardInvalidData,
+	WizardButtonBelongsToOtherPartner
 } PACKED;
 
 enum BluetoothControllerState {
@@ -139,11 +147,11 @@ typedef struct {
 	uint32_t ping_id;
 } PACKED CmdPing;
 
-#define CMD_GET_BUTTON_UUID_OPCODE 8
+#define CMD_GET_BUTTON_INFO_OPCODE 8
 typedef struct {
 	uint8_t opcode;
 	uint8_t bd_addr[6];
-} PACKED CmdGetButtonUUID;
+} PACKED CmdGetButtonInfo;
 
 #define CMD_CREATE_SCAN_WIZARD_OPCODE 9
 typedef struct {
@@ -156,6 +164,25 @@ typedef struct {
 	uint8_t opcode;
 	uint32_t scan_wizard_id;
 } PACKED CmdCancelScanWizard;
+
+#define CMD_DELETE_BUTTON_OPCODE 11
+typedef struct {
+	uint8_t opcode;
+	uint8_t bd_addr[6];
+} PACKED CmdDeleteButton;
+
+#define CMD_CREATE_BATTERY_STATUS_LISTENER_OPCODE 12
+typedef struct {
+	uint8_t opcode;
+	uint32_t listener_id;
+	uint8_t bd_addr[6];
+} PACKED CmdCreateBatteryStatusListener;
+
+#define CMD_REMOVE_BATTERY_STATUS_LISTENER_OPCODE 13
+typedef struct {
+	uint8_t opcode;
+	uint32_t listener_id;
+} PACKED CmdRemoveBatteryStatusListener;
 
 /// Events
 
@@ -251,12 +278,14 @@ typedef struct {
 	uint32_t ping_id;
 } PACKED EvtPingResponse;
 
-#define EVT_GET_BUTTON_UUID_RESPONSE_OPCODE 14
+#define EVT_GET_BUTTON_INFO_RESPONSE_OPCODE 14
 typedef struct {
 	uint8_t opcode;
 	uint8_t bd_addr[6];
 	uint8_t uuid[16];
-} PACKED EvtGetButtonUUIDResponse;
+	uint8_t color_length;
+	char color[16];
+} PACKED EvtGetButtonInfoResponse;
 
 typedef struct {
 	uint8_t opcode;
@@ -286,6 +315,21 @@ typedef struct {
 	EvtScanWizardBase base;
 	enum ScanWizardResult result;
 } PACKED EvtScanWizardCompleted;
+
+#define EVT_BUTTON_DELETED_OPCODE 19
+typedef struct {
+	uint8_t opcode;
+	uint8_t bd_addr[6];
+	uint8_t deleted_by_this_client;
+} PACKED EvtButtonDeleted;
+
+#define EVT_BATTERY_STATUS_OPCODE 20
+typedef struct {
+	uint8_t opcode;
+	uint32_t listener_id;
+	int8_t battery_percentage;
+	int64_t timestamp;
+} PACKED EvtBatteryStatus;
 
 #ifdef __cplusplus
 }

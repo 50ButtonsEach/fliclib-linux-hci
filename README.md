@@ -78,6 +78,10 @@ Usage: ./flicd -f sqlite_db_file.db [options]
                     with a different bluetooth controller. Then simply use the same bdaddr for both controllers.
                     Must be of the form xx:xx:xx:xx:xx:xx (6 hexadecimal numbers) where the first byte is between 0xc0 and 0xff.
                     
+    --app-id        App ID for PbF customers.
+                    
+    --app-secret    App secret for PbF customers.
+                    
 -s  --server-addr   Server IP address to bind to. 127.0.0.1 is the default which means only clients on this computer
                     can connect to the server. Use 0.0.0.0 if you want the server to be accessible from the outside.
                     
