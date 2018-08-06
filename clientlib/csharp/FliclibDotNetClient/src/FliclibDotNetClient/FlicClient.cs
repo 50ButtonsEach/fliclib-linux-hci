@@ -27,11 +27,12 @@ namespace FliclibDotNetClient
                                            Bdaddr[] verifiedButtons);
 
     /// <summary>
-    /// Callback for GetButtonUUID
+    /// Callback for GetButtonInfo
     /// </summary>
     /// <param name="bdAddr">The Bluetooth device address for the request</param>
     /// <param name="uuid">The UUID of the button. Will be null if the button was not verified bufore.</param>
-    public delegate void GetButtonUUIDResponseCallback(Bdaddr bdAddr, string uuid);
+    /// <param name="color">The color of the button. Will be null if the button was not verified before.</param>
+    public delegate void GetButtonInfoResponseCallback(Bdaddr bdAddr, string uuid, string color);
 
     /// <summary>
     /// NewVerifiedButtonEventArgs
@@ -67,6 +68,22 @@ namespace FliclibDotNetClient
     }
 
     /// <summary>
+    /// ButtonDeletedEventArgs
+    /// </summary>
+    public class ButtonDeletedEventArgs : EventArgs
+    {
+        /// <summary>
+        /// Bluetooth device address of removed button
+        /// </summary>
+        public Bdaddr BdAddr { get; internal set; }
+
+        /// <summary>
+        /// Whether or not the button was deleted by this client
+        /// </summary>
+        public bool DeletedByThisClient { get; internal set; }
+    }
+
+    /// <summary>
     /// Flic client class
     /// 
     /// For overview of the protocol and more detailed documentation, see the protocol documentation.
@@ -92,7 +109,7 @@ namespace FliclibDotNetClient
         private readonly ConcurrentDictionary<uint, ButtonConnectionChannel> _connectionChannels = new ConcurrentDictionary<uint, ButtonConnectionChannel>();
         private readonly ConcurrentDictionary<uint, ScanWizard> _scanWizards = new ConcurrentDictionary<uint, ScanWizard>();
         private readonly ConcurrentQueue<GetInfoResponseCallback> _getInfoResponseCallbackQueue = new ConcurrentQueue<GetInfoResponseCallback>();
-        private readonly Queue<GetButtonUUIDResponseCallback> _getButtonUUIDResponseCallbackQueue = new Queue<GetButtonUUIDResponseCallback>();
+        private readonly Queue<GetButtonInfoResponseCallback> _getButtonInfoResponseCallbackQueue = new Queue<GetButtonInfoResponseCallback>();
         private readonly SortedDictionary<long, Action> _timers = new SortedDictionary<long, Action>(); 
 
         /// <summary>
@@ -115,6 +132,11 @@ namespace FliclibDotNetClient
         /// This event will be raised when the number of concurrent connections has decreased from the maximum by one (only sent by the Linux server implementation).
         /// </summary>
         public event EventHandler<SpaceForNewConnectionEventArgs> GotSpaceForNewConnection;
+
+        /// <summary>
+        /// Raised when a button is deleted, or when this client tries to delete a non-existing button.
+        /// </summary>
+        public event EventHandler<ButtonDeletedEventArgs> ButtonDeleted;
         
         private FlicClient()
         {
@@ -239,17 +261,17 @@ namespace FliclibDotNetClient
         /// </summary>
         /// <param name="bdAddr">Bluetooth device address</param>
         /// <param name="callback">Callback to be invoked when the response arrives</param>
-        public void GetButtonUUID(Bdaddr bdAddr, GetButtonUUIDResponseCallback callback)
+        public void GetButtonInfo(Bdaddr bdAddr, GetButtonInfoResponseCallback callback)
         {
             if (callback == null)
             {
                 throw new ArgumentNullException(nameof(callback));
             }
 
-            lock (_getButtonUUIDResponseCallbackQueue)
+            lock (_getButtonInfoResponseCallbackQueue)
             {
-                _getButtonUUIDResponseCallbackQueue.Enqueue(callback);
-                SendPacket(new CmdGetButtonUUID { BdAddr = bdAddr });
+                _getButtonInfoResponseCallbackQueue.Enqueue(callback);
+                SendPacket(new CmdGetButtonInfo { BdAddr = bdAddr });
             }
         }
 
@@ -706,16 +728,16 @@ namespace FliclibDotNetClient
                         BluetoothControllerStateChange.RaiseEvent(this, new BluetoothControllerStateChangeEventArgs { State = pkt.State });
                     }
                     break;
-                case EventPacket.EVT_GET_BUTTON_UUID_RESPONSE_OPCODE:
+                case EventPacket.EVT_GET_BUTTON_INFO_RESPONSE_OPCODE:
                     {
-                        var pkt = new EvtGetButtonUUIDResponse();
+                        var pkt = new EvtGetButtonInfoResponse();
                         pkt.Parse(packet);
-                        GetButtonUUIDResponseCallback callback;
-                        lock (_getButtonUUIDResponseCallbackQueue)
+                        GetButtonInfoResponseCallback callback;
+                        lock (_getButtonInfoResponseCallbackQueue)
                         {
-                            callback = _getButtonUUIDResponseCallbackQueue.Dequeue();
+                            callback = _getButtonInfoResponseCallbackQueue.Dequeue();
                         }
-                        callback(pkt.BdAddr, pkt.Uuid);
+                        callback(pkt.BdAddr, pkt.Uuid, pkt.Color);
                     }
                     break;
                 case EventPacket.EVT_SCAN_WIZARD_FOUND_PRIVATE_BUTTON_OPCODE:
@@ -753,6 +775,13 @@ namespace FliclibDotNetClient
                         wizard.BdAddr = null;
                         wizard.Name = null;
                         wizard.OnCompleted(eventArgs);
+                    }
+                    break;
+                case EventPacket.EVT_BUTTON_DELETED_OPCODE:
+                    {
+                        var pkt = new EvtButtonDeleted();
+                        pkt.Parse(packet);
+                        ButtonDeleted.RaiseEvent(this, new ButtonDeletedEventArgs { BdAddr = pkt.BdAddr, DeletedByThisClient = pkt.DeletedByThisClient });
                     }
                     break;
             }

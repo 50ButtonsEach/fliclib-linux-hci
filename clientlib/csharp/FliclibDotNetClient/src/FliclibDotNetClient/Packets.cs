@@ -122,7 +122,7 @@ namespace FliclibDotNetClient
         }
     }
 
-    internal class CmdGetButtonUUID : CommandPacket
+    internal class CmdGetButtonInfo : CommandPacket
     {
         internal Bdaddr BdAddr;
 
@@ -155,6 +155,17 @@ namespace FliclibDotNetClient
         }
     }
 
+    internal class CmdDeleteButton : CommandPacket
+    {
+        internal Bdaddr BdAddr;
+
+        protected override void Write(BinaryWriter writer)
+        {
+            Opcode = 11;
+            BdAddr.WriteBytes(writer);
+        }
+    }
+
     internal abstract class EventPacket
     {
         internal const int EVT_ADVERTISEMENT_PACKET_OPCODE = 0;
@@ -171,11 +182,12 @@ namespace FliclibDotNetClient
         internal const int EVT_GOT_SPACE_FOR_NEW_CONNECTION_OPCODE = 11;
         internal const int EVT_BLUETOOTH_CONTROLLER_STATE_CHANGE_OPCODE = 12;
         internal const int EVT_PING_RESPONSE_OPCODE = 13;
-        internal const int EVT_GET_BUTTON_UUID_RESPONSE_OPCODE = 14;
+        internal const int EVT_GET_BUTTON_INFO_RESPONSE_OPCODE = 14;
         internal const int EVT_SCAN_WIZARD_FOUND_PRIVATE_BUTTON_OPCODE = 15;
         internal const int EVT_SCAN_WIZARD_FOUND_PUBLIC_BUTTON_OPCODE = 16;
         internal const int EVT_SCAN_WIZARD_BUTTON_CONNECTED_OPCODE = 17;
         internal const int EVT_SCAN_WIZARD_COMPLETED_OPCODE = 18;
+        internal const int EVT_BUTTON_DELETED_OPCODE = 19;
         
         internal void Parse(byte[] arr)
         {
@@ -342,10 +354,11 @@ namespace FliclibDotNetClient
         }
     }
 
-    internal class EvtGetButtonUUIDResponse : EventPacket
+    internal class EvtGetButtonInfoResponse : EventPacket
     {
         internal Bdaddr BdAddr;
         internal string Uuid;
+        internal string Color;
 
         protected override void ParseInternal(BinaryReader reader)
         {
@@ -365,6 +378,23 @@ namespace FliclibDotNetClient
             {
                 Uuid = null;
             }
+
+            if (reader.PeekChar() == -1)
+            {
+                // For old protocol
+                return;
+            }
+            int colorLen = reader.ReadByte();
+            var bytes = new byte[colorLen];
+            for (var i = 0; i < colorLen; i++)
+            {
+                bytes[i] = reader.ReadByte();
+            }
+            for (var i = colorLen; i < 16; i++)
+            {
+                reader.ReadByte();
+            }
+            Color = colorLen == 0 ? null : Encoding.UTF8.GetString(bytes);
         }
     }
 
@@ -421,6 +451,18 @@ namespace FliclibDotNetClient
         {
             ScanWizardId = reader.ReadUInt32();
             Result = (ScanWizardResult)reader.ReadByte();
+        }
+    }
+
+    internal class EvtButtonDeleted : EventPacket
+    {
+        internal Bdaddr BdAddr;
+        internal bool DeletedByThisClient;
+
+        protected override void ParseInternal(BinaryReader reader)
+        {
+            BdAddr = new Bdaddr(reader);
+            DeletedByThisClient = reader.ReadBoolean();
         }
     }
 }
