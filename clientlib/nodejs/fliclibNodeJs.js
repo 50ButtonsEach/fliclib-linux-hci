@@ -51,7 +51,7 @@ var FlicEventOpcodes = {
 
 function createBuffer(arr, offset, len) {
 	arr = new Uint8Array(arr, offset, len);
-	return new Buffer(arr);
+	return Buffer.allocUnsafe ? Buffer.from(arr) : new Buffer(arr);
 }
 
 /**
