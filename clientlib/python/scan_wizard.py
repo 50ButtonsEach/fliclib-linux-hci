@@ -16,7 +16,7 @@ def done(bd_addr):
 	print("Button " + bd_addr + " was successfully added!")
 	client.close()
 
-def on_adv_packet(scanner, bd_addr, name, rssi, is_private, already_verified):
+def on_adv_packet(scanner, bd_addr, name, rssi, is_private, already_verified, already_connected_to_this_device, already_connected_to_other_device):
 	if already_verified:
 		return
 	

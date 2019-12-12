@@ -461,7 +461,7 @@ public class FlicClient {
                 pkt.parse(packet);
                 ButtonScanner scanner = scanners.get(pkt.scanId);
                 if (scanner != null) {
-                    scanner.onAdvertisementPacket(pkt.addr, pkt.name, pkt.rssi, pkt.isPrivate, pkt.alreadyVerified);
+                    scanner.onAdvertisementPacket(pkt.addr, pkt.name, pkt.rssi, pkt.isPrivate, pkt.alreadyVerified, pkt.alreadyConnectedToThisDevice, pkt.alreadyConnectedToOtherDevice);
                 }
                 break;
             }
@@ -561,7 +561,7 @@ public class FlicClient {
             case EventPacket.EVT_GET_BUTTON_INFO_RESPONSE_OPCODE: {
                 EvtGetButtonInfoResponse pkt = new EvtGetButtonInfoResponse();
                 pkt.parse(packet);
-                getButtonInfoResponseCallbackQueue.remove().onGetButtonInfoResponse(pkt.bdaddr, pkt.uuid, pkt.color);
+                getButtonInfoResponseCallbackQueue.remove().onGetButtonInfoResponse(pkt.bdaddr, pkt.uuid, pkt.color, pkt.serialNumber);
                 break;
             }
             case EventPacket.EVT_SCAN_WIZARD_FOUND_PRIVATE_BUTTON_OPCODE: {

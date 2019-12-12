@@ -1,5 +1,5 @@
 # Flic SDK for Linux Beta
-With this SDK you can connect to and interact with Flic buttons.
+With this SDK you can connect to and interact with Flic buttons. PbF, Flic 1 as well as Flic 2 buttons are supported.
 
 ## Previous SDK
 
@@ -58,7 +58,7 @@ The server process needs to have access to the Bluetooth HCI channel. There are 
 
 Now start the daemon in one terminal by executing `./flicd -f flic.sqlite3`. Additional options are listed if you leave out the database argument.
 
-In another terminal open the simpleclient directory, compile it with make and run with `./simpleclient localhost`. You will be shown the available commands. Type `startScanWizard` and press enter to scan and add a button. Then press your flic button (and make sure it is disconnected to any other devices such as a smartphone) and follow the instructions in the console. After your button has been added, enter the command `connect <BDADDR> <id>` where `<BDADDR>` is the address that appeared during scan. For `<id>`, put any integer that will be used later to refer to this connection. The button should now connect and you will see click events appear. Type `disconnect <id>` to later disconnect.
+In another terminal open the simpleclient directory, compile it with make and run with `./simpleclient localhost`. You will be shown the available commands. Type `startScanWizard` and press enter to scan and add a button. Then press and hold down your flic button (and make sure it is disconnected to any other devices such as a smartphone) and follow the instructions in the console. After your button has been added, enter the command `connect <BDADDR> <id>` where `<BDADDR>` is the address that appeared during scan. For `<id>`, put any integer that will be used later to refer to this connection. The button should now connect and you will see click events appear. Type `disconnect <id>` to later disconnect.
 
 You can also try out the websocket example. Run both the daemon and the websocket proxy. Then open up the client html page.
 

@@ -55,8 +55,8 @@ static const char* RemovedReasonStrings[] = {
 	
 	"DeletedByThisClient",
 	"DeletedByOtherClient",
-	
-	"ButtonBelongsToOtherPartner"
+	"ButtonBelongsToOtherPartner",
+	"DeletedFromButton"
 };
 
 static const char* ClickTypeStrings[] = {
@@ -87,7 +87,8 @@ static const char* ScanWizardResultStrings[] = {
 	"WizardBluetoothUnavailable",
 	"WizardInternetBackendError",
 	"WizardInvalidData",
-	"WizardButtonBelongsToOtherPartner"
+	"WizardButtonBelongsToOtherPartner",
+	"WizardButtonAlreadyConnectedToOtherDevice"
 };
 
 static const char* BluetoothControllerStateStrings[] = {
@@ -213,6 +214,7 @@ static void print_help() {
 	"getButtonInfo xx:xx:xx:xx:xx:xx - get button info for a verified button\n"
 	"createBatteryStatusListener xx:xx:xx:xx:xx:xx id - first parameter is the bluetooth address of the button, second is an integer you set to identify this listener\n"
 	"removeBatteryStatusListener id - removes a battery listener\n"
+	"delete xx:xx:xx:xx:xx:xx - delete button\n"
 	"help - prints this help text\n"
 	"\n";
 	fprintf(stderr, help_text);
@@ -279,7 +281,7 @@ int main(int argc, char* argv[]) {
 				cmd.scan_wizard_id = 0;
 				write_packet(sockfd, &cmd, sizeof(cmd));
 				
-				printf("Please click your Flic button!\n");
+				printf("Please click and hold down your Flic button!\n");
 			}
 			if (strcmp("cancelScanWizard", cmd) == 0) {
 				CmdCancelScanWizard cmd;
@@ -361,6 +363,12 @@ int main(int argc, char* argv[]) {
 				scanf("%u", &cmd.listener_id);
 				write_packet(sockfd, &cmd, sizeof(cmd));
 			}
+			if (strcmp("delete", cmd) == 0) {
+				CmdDeleteButton cmd;
+				cmd.opcode = CMD_DELETE_BUTTON_OPCODE;
+				memcpy(cmd.bd_addr, read_bdaddr().addr, 6);
+				write_packet(sockfd, &cmd, sizeof(cmd));
+			}
 			if (strcmp("help", cmd) == 0) {
 				print_help();
 			}
@@ -400,7 +408,15 @@ int main(int argc, char* argv[]) {
 			switch (readbuf[0]) {
 				case EVT_ADVERTISEMENT_PACKET_OPCODE: {
 					EvtAdvertisementPacket* evt = (EvtAdvertisementPacket*)pkt;
-					printf("ADV: %s %s %d %s %s\n", Bdaddr(evt->bd_addr).to_string().c_str(), string(evt->name, (size_t)evt->name_length).c_str(), evt->rssi, (evt->is_private ? "private" : "public"), (evt->already_verified ? "verified" : "unverified"));
+					printf("ADV: %s %s %d %s %s%s%s\n",
+					       Bdaddr(evt->bd_addr).to_string().c_str(),
+					       string(evt->name, (size_t)evt->name_length).c_str(),
+					       evt->rssi,
+					       (evt->is_private ? "private" : "public"),
+					       (evt->already_verified ? "verified" : "unverified"),
+					       (evt->already_connected_to_this_device ? " already connected to this device" : ""),
+					       (evt->already_connected_to_other_device ? " already connected to other device" : "")
+					);
 					break;
 				}
 				case EVT_CREATE_CONNECTION_CHANNEL_RESPONSE_OPCODE: {
@@ -470,7 +486,12 @@ int main(int argc, char* argv[]) {
 				}
 				case EVT_GET_BUTTON_INFO_RESPONSE_OPCODE: {
 					EvtGetButtonInfoResponse* evt = (EvtGetButtonInfoResponse*)pkt;
-					printf("Button info response: %s %s %s\n", Bdaddr(evt->bd_addr).to_string().c_str(), bytes_to_hex_string(evt->uuid, sizeof(evt->uuid)).c_str(), string(evt->color, (size_t)evt->color_length).c_str());
+					printf("Button info response: %s %s %s %s\n",
+					       Bdaddr(evt->bd_addr).to_string().c_str(),
+					       bytes_to_hex_string(evt->uuid, sizeof(evt->uuid)).c_str(),
+					       string(evt->color, (size_t)evt->color_length).c_str(),
+					       string(evt->serial_number, (size_t)evt->serial_number_length).c_str()
+					);
 					break;
 				}
 				case EVT_SCAN_WIZARD_FOUND_PRIVATE_BUTTON_OPCODE: {
@@ -494,6 +515,11 @@ int main(int argc, char* argv[]) {
 				case EVT_BATTERY_STATUS_OPCODE: {
 					EvtBatteryStatus* evt = (EvtBatteryStatus*)pkt;
 					printf("Battery status report for id %d, percentage: %d%%, timestamp: %s\n", evt->listener_id, evt->battery_percentage, ctime((time_t*)&evt->timestamp));
+					break;
+				}
+				case EVT_BUTTON_DELETED_OPCODE: {
+					EvtButtonDeleted* evt = (EvtButtonDeleted*)pkt;
+					printf("Button %s deleted %s\n", Bdaddr(evt->bd_addr).to_string().c_str(), evt->deleted_by_this_client ? "by this client" : "not by this client");
 					break;
 				}
 			}

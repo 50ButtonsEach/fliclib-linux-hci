@@ -17,6 +17,6 @@ public enum RemovedReason {
     
     DeletedByThisClient,
     DeletedByOtherClient,
-    
-    ButtonBelongsToOtherPartner
+    ButtonBelongsToOtherPartner,
+    DeletedFromButton
 }

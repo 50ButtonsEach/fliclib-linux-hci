@@ -52,8 +52,8 @@ enum RemovedReason {
 	
 	DeletedByThisClient,
 	DeletedByOtherClient,
-	
-	ButtonBelongsToOtherPartner
+	ButtonBelongsToOtherPartner,
+	DeletedFromButton
 } PACKED;
 
 enum ClickType {
@@ -84,7 +84,8 @@ enum ScanWizardResult {
 	WizardBluetoothUnavailable,
 	WizardInternetBackendError,
 	WizardInvalidData,
-	WizardButtonBelongsToOtherPartner
+	WizardButtonBelongsToOtherPartner,
+	WizardButtonAlreadyConnectedToOtherDevice
 } PACKED;
 
 enum BluetoothControllerState {
@@ -196,6 +197,8 @@ typedef struct {
 	int8_t rssi;
 	int8_t is_private;
 	int8_t already_verified;
+	int8_t already_connected_to_this_device;
+	int8_t already_connected_to_other_device;
 } PACKED EvtAdvertisementPacket;
 
 typedef struct {
@@ -285,6 +288,8 @@ typedef struct {
 	uint8_t uuid[16];
 	uint8_t color_length;
 	char color[16];
+	uint8_t serial_number_length;
+	char serial_number[16];
 } PACKED EvtGetButtonInfoResponse;
 
 typedef struct {

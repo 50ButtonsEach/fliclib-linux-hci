@@ -8,5 +8,6 @@ public enum ScanWizardResult {
     WizardBluetoothUnavailable,
     WizardInternetBackendError,
     WizardInvalidData,
-    WizardButtonBelongsToOtherPartner
+    WizardButtonBelongsToOtherPartner,
+    WizardButtonAlreadyConnectedToOtherDevice
 }

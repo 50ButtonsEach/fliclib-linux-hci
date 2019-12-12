@@ -10,7 +10,7 @@ var FlicScanWizard = fliclib.FlicScanWizard;
 var client = new FlicClient("localhost", 5551);
 
 function startScanWizard() {
-	console.log("Welcome to the add new button wizard. Press your Flic button to add it.");
+	console.log("Welcome to the add new button wizard. Press and hold down your Flic button to add it.");
 	
 	var wizard = new FlicScanWizard();
 	wizard.on("foundPrivateButton", function() {

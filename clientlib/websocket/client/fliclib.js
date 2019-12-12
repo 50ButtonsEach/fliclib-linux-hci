@@ -96,8 +96,8 @@ var FlicRawWebsocketClient = function(wsAddress) {
 			
 			DeletedByThisClient: 8,
 			DeletedByOtherClient: 9,
-			
-			ButtonBelongsToOtherPartner: 10
+			ButtonBelongsToOtherPartner: 10,
+			DeletedFromButton: 11
 		},
 
 		ClickType: {
@@ -128,7 +128,8 @@ var FlicRawWebsocketClient = function(wsAddress) {
 			WizardBluetoothUnavailable: 4,
 			WizardInternetBackendError: 5,
 			WizardInvalidData: 6,
-			WizardButtonBelongsToOtherPartner: 7
+			WizardButtonBelongsToOtherPartner: 7,
+			WizardButtonAlreadyConnectedToOtherDevice: 8
 		},
 
 		BluetoothControllerState: {
@@ -235,7 +236,9 @@ var FlicRawWebsocketClient = function(wsAddress) {
 					name: readString(),
 					rssi: readInt8(),
 					isPrivate: readBoolean(),
-					alreadyVerified: readBoolean()
+					alreadyVerified: readBoolean(),
+					alreadyConnectedToThisDevice: readBoolean(),
+					alreadyConnectedtoOtherDevice: readBoolean()
 				};
 				me.onEvent(opcode, evt);
 				break;
@@ -329,7 +332,8 @@ var FlicRawWebsocketClient = function(wsAddress) {
 				var evt = {
 					bdAddr: readBdAddr(),
 					uuid: readUuid(),
-					color: readString() || null
+					color: readString() || null,
+					serialNumber: readString() || null
 				};
 				me.onEvent(opcode, evt);
 				break;
@@ -623,7 +627,7 @@ var FlicScanner = (function() {
 	return function(options) {
 		options = options || {};
 		
-		var onAdvertisementPacket = options.onAdvertisementPacket || function(bdAddr, name, rssi, isPrivate, alreadyVerified){};
+		var onAdvertisementPacket = options.onAdvertisementPacket || function(bdAddr, name, rssi, isPrivate, alreadyVerified, alreadyConnectedToThisDevice, alreadyConnectedtoOtherDevice){};
 		
 		var id = counter;
 		counter = (counter + 1) | 0;
@@ -643,7 +647,7 @@ var FlicScanner = (function() {
 		this._onEvent = function(opcode, event) {
 			switch (opcode) {
 				case FlicEventOpcodes.AdvertisementPacket:
-					onAdvertisementPacket(event.bdAddr, event.name, event.rssi, event.isPrivate, event.alreadyVerified);
+					onAdvertisementPacket(event.bdAddr, event.name, event.rssi, event.isPrivate, event.alreadyVerified, event.alreadyConnectedToThisDevice, event.alreadyConnectedtoOtherDevice);
 					break;
 			}
 		};
@@ -781,7 +785,7 @@ var FlicClient = function(wsAddress) {
 			}
 			case FlicEventOpcodes.GetButtonInfoResponse: {
 				var callback = getButtonInfoCallbackQueue.shift();
-				callback(event.bdAddr, event.uuid, event.color);
+				callback(event.bdAddr, event.uuid, event.color, event.serialNumber);
 				break;
 			}
 			case FlicEventOpcodes.ScanWizardFoundPrivateButton:

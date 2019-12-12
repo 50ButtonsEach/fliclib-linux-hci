@@ -93,8 +93,8 @@ var FlicRawClient = function(inetAddress, port) {
 			
 			DeletedByThisClient: 8,
 			DeletedByOtherClient: 9,
-			
-			ButtonBelongsToOtherPartner: 10
+			ButtonBelongsToOtherPartner: 10,
+			DeletedFromButton: 11
 		},
 
 		ClickType: {
@@ -125,7 +125,8 @@ var FlicRawClient = function(inetAddress, port) {
 			WizardBluetoothUnavailable: 4,
 			WizardInternetBackendError: 5,
 			WizardInvalidData: 6,
-			WizardButtonBelongsToOtherPartner: 7
+			WizardButtonBelongsToOtherPartner: 7,
+			WizardButtonAlreadyConnectedToOtherDevice: 8
 		},
 
 		BluetoothControllerState: {
@@ -248,7 +249,9 @@ var FlicRawClient = function(inetAddress, port) {
 					name: readString(),
 					rssi: readInt8(),
 					isPrivate: readBoolean(),
-					alreadyVerified: readBoolean()
+					alreadyVerified: readBoolean(),
+					alreadyConnectedToThisDevice: readBoolean(),
+					alreadyConnectedToOtherDevice: readBoolean()
 				};
 				me.onEvent(opcode, evt);
 				break;
@@ -342,7 +345,8 @@ var FlicRawClient = function(inetAddress, port) {
 				var evt = {
 					bdAddr: readBdAddr(),
 					uuid: readUuid(),
-					color: readString() || null
+					color: readString() || null,
+					serialNumber: readString() || null
 				};
 				me.onEvent(opcode, evt);
 				break;
@@ -658,7 +662,7 @@ util.inherits(FlicBatteryStatusListener, EventEmitter);
  * Constructor: no parameters
  * 
  * Events:
- * advertisementPacket: bdAddr, name, rssi, isPrivate, alreadyVerified
+ * advertisementPacket: bdAddr, name, rssi, isPrivate, alreadyVerified, alreadyConnectedToThisDevice, alreadyConnectedToOtherDevice
  */
 var FlicScanner = (function() {
 	var counter = 0;
@@ -686,7 +690,7 @@ var FlicScanner = (function() {
 		this._onEvent = function(opcode, event) {
 			switch (opcode) {
 				case FlicEventOpcodes.AdvertisementPacket:
-					me.emit("advertisementPacket", event.bdAddr, event.name, event.rssi, event.isPrivate, event.alreadyVerified);
+					me.emit("advertisementPacket", event.bdAddr, event.name, event.rssi, event.isPrivate, event.alreadyVerified, event.alreadyConnectedToThisDevice, event.alreadyConnectedToOtherDevice);
 					break;
 			}
 		};
@@ -783,7 +787,7 @@ util.inherits(FlicScanWizard, EventEmitter);
  *   currentPendingConnections,
  *   bdAddrOfVerifiedButtons
  * getButtonInfo: bdAddr, callback
- *   Callback parameters: bdAddr, uuid, color
+ *   Callback parameters: bdAddr, uuid, color, serialNumber
  * deleteButton: bdAddr
  * close
  * 
@@ -872,7 +876,7 @@ var FlicClient = function(host, port) {
 			}
 			case FlicEventOpcodes.GetButtonInfoResponse: {
 				var callback = getButtonInfoCallbackQueue.shift();
-				callback(event.bdAddr, event.uuid, event.color);
+				callback(event.bdAddr, event.uuid, event.color, event.serialNumber);
 				break;
 			}
 			case FlicEventOpcodes.ScanWizardFoundPrivateButton:

@@ -41,8 +41,8 @@ namespace FliclibDotNetClient
 
         DeletedByThisClient,
         DeletedByOtherClient,
-
-        ButtonBelongsToOtherPartner
+        ButtonBelongsToOtherPartner,
+        DeletedFromButton
     };
 
     public enum ClickType : byte
@@ -77,7 +77,8 @@ namespace FliclibDotNetClient
         WizardBluetoothUnavailable,
         WizardInternetBackendError,
         WizardInvalidData,
-        WizardButtonBelongsToOtherPartner
+        WizardButtonBelongsToOtherPartner,
+        WizardButtonAlreadyConnectedToOtherDevice
     };
 
     public enum BluetoothControllerState : byte

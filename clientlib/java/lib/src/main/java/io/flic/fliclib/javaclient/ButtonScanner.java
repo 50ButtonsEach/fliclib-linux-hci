@@ -21,6 +21,8 @@ public abstract class ButtonScanner {
      * @param rssi RSSI value in dBm
      * @param isPrivate The button is private and won't accept new connections from non-bonded clients
      * @param alreadyVerified The server has already verified this button, which means you can connect to it even if it's private
+     * @param alreadyConnectedToThisDevice The button is already connected to this device
+     * @param alreadyConnectedToOtherDevice The button is already connected to another device
      */
-    public abstract void onAdvertisementPacket(Bdaddr bdaddr, String name, int rssi, boolean isPrivate, boolean alreadyVerified) throws IOException;
+    public abstract void onAdvertisementPacket(Bdaddr bdaddr, String name, int rssi, boolean isPrivate, boolean alreadyVerified, boolean alreadyConnectedToThisDevice, boolean alreadyConnectedToOtherDevice) throws IOException;
 }

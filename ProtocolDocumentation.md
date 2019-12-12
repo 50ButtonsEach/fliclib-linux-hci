@@ -10,6 +10,7 @@ The protocol is designed to be simple to implement and use, while still being po
  - Enums are encoded as a single byte. The corresponding integer byte value is 0 for the first possible value, then 1, then 2 and so on for the other values.
  - There are no alignment or padding between items in a packet.
  - The items are serialized in the same order as noted in this document.
+ - In future versions the packets might get extended with more fields. When receiving a packet, ignore excessive bytes not specified in this document.
 
 A bluetooth address (bdaddr_t) is encoded in little endan, 6 bytes in total. When such an address is written as a string, it is normally written in big endian, where each byte is encoded in hex and colon as separator for each byte. For example, the address `08:09:0a:0b:0c:0d` is encoded as the bytes `0x0d, 0x0c, 0x0b, 0x0a, 0x09, 0x08`.
 
@@ -120,8 +121,6 @@ The next reason may only occur on Windows (i.e. the Windows daemon is used).
 **CouldntLoadDevice**
 The file representing the Flic Bluetooth device could not be opened, or it is reporting invalid status. If this happens, manually unpair the device in Windows's Bluetooth settings.
 
-The next two reasons might only happen if the Flic button is previously verified.
-
 **DeletedByThisClient** -
 The button was deleted by this client by a call to CmdDeleteButton.
 
@@ -130,6 +129,9 @@ The button was deleted by another client by a call to CmdDeleteButton.
 
 **ButtonBelongsToOtherPartner** -
 The button belongs to another PbF partner.
+
+**DeletedFromButton** -
+The button was factory reset, or the pairing has been removed to fit a new one.
 
 ### ClickType
 **ButtonDown** -
@@ -207,6 +209,9 @@ According to the Flic backend, this Flic button supplied invalid identity data.
 
 **WizardButtonBelongsToOtherPartner** -
 The button belongs to another PbF partner.
+
+**WizardButtonAlreadyConnectedToOtherDevice** -
+The Flic 2 button is already connected to another device. Please disconnect it first so it becomes available.
 
 Commands
 --------
@@ -370,6 +375,12 @@ The Flic button is currently in private mode and won't accept connections from u
 _bool_ **already_verified**:
 If the server has the bonding key for this Flic button, this value is true. That means you should be able to connect to it.
 
+_bool_ **already_connected_to_this_device**:
+This Flic 2 button is already connected to this device.
+
+_bool_ **already_connected_to_other_device**:
+This Flic 2 button is already connected to another device.
+
 ### EvtCreateConnectionChannelResponse
 This event will always be sent when a CmdCreateConnectionChannel is received, containing the status of the request.
 
@@ -523,6 +534,11 @@ _char[16]_ **color**:
 The first _color\_length_ bytes of this array contain the UTF-8 encoding of the color. The other bytes will be zeros.
 Currently the following strings are defined: `black`, `white`, `turquoise`, `green` and `yellow` but more colors may be added later, so don't expect these are the only possible values.
 
+_uint8\_t_ **serial_number_length**:
+The length in bytes of the serial number following.
+
+_char[16]_ **serial_number**:
+The serial number of the button, in UTF-8 encoding. Only the first _serial\_number\_length_ bytes are used. The other bytes will be zeros.
 
 ### EvtScanWizardFoundPrivateButton
 Sent once if a previously not verified private button is found during the scan. If this is received, tell the user to hold the button down for 7 seconds.

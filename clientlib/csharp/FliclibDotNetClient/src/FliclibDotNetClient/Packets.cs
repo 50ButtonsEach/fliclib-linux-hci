@@ -207,6 +207,8 @@ namespace FliclibDotNetClient
         internal int Rssi;
         internal bool IsPrivate;
         internal bool AlreadyVerified;
+        internal bool AlreadyConnectedToThisDevice;
+        internal bool AlreadyConnectedToOtherDevice;
 
         protected override void ParseInternal(BinaryReader reader)
         {
@@ -226,6 +228,8 @@ namespace FliclibDotNetClient
             Rssi = reader.ReadSByte();
             IsPrivate = reader.ReadBoolean();
             AlreadyVerified = reader.ReadBoolean();
+            AlreadyConnectedToThisDevice = reader.ReadBoolean();
+            AlreadyConnectedToOtherDevice = reader.ReadBoolean();
         }
     }
 
@@ -359,6 +363,7 @@ namespace FliclibDotNetClient
         internal Bdaddr BdAddr;
         internal string Uuid;
         internal string Color;
+        internal string SerialNumber;
 
         protected override void ParseInternal(BinaryReader reader)
         {
@@ -385,16 +390,28 @@ namespace FliclibDotNetClient
                 return;
             }
             int colorLen = reader.ReadByte();
-            var bytes = new byte[colorLen];
+            var colorBytes = new byte[colorLen];
             for (var i = 0; i < colorLen; i++)
             {
-                bytes[i] = reader.ReadByte();
+                colorBytes[i] = reader.ReadByte();
             }
             for (var i = colorLen; i < 16; i++)
             {
                 reader.ReadByte();
             }
-            Color = colorLen == 0 ? null : Encoding.UTF8.GetString(bytes);
+            Color = colorLen == 0 ? null : Encoding.UTF8.GetString(colorBytes);
+
+            int serialNumberLen = reader.ReadByte();
+            var serialNumberBytes = new byte[serialNumberLen];
+            for (var i = 0; i < serialNumberLen; i++)
+            {
+                serialNumberBytes[i] = reader.ReadByte();
+            }
+            for (var i = serialNumberLen; i < 16; i++)
+            {
+                reader.ReadByte();
+            }
+            SerialNumber = serialNumberLen == 0 ? null : Encoding.UTF8.GetString(serialNumberBytes);
         }
     }
 

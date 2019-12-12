@@ -31,8 +31,9 @@ namespace FliclibDotNetClient
     /// </summary>
     /// <param name="bdAddr">The Bluetooth device address for the request</param>
     /// <param name="uuid">The UUID of the button. Will be null if the button was not verified bufore.</param>
-    /// <param name="color">The color of the button. Will be null if the button was not verified before.</param>
-    public delegate void GetButtonInfoResponseCallback(Bdaddr bdAddr, string uuid, string color);
+    /// <param name="color">The color of the button. Will be null if unknown or the button was not verified bufore.</param>
+    /// <param name="serialNumber">The serial number of the button. Will be null if the button was not verified bufore.</param>
+    public delegate void GetButtonInfoResponseCallback(Bdaddr bdAddr, string uuid, string color, string serialNumber);
 
     /// <summary>
     /// NewVerifiedButtonEventArgs
@@ -137,7 +138,7 @@ namespace FliclibDotNetClient
         /// Raised when a button is deleted, or when this client tries to delete a non-existing button.
         /// </summary>
         public event EventHandler<ButtonDeletedEventArgs> ButtonDeleted;
-        
+
         private FlicClient()
         {
             _socketWriteEventArgs = new SocketAsyncEventArgs();
@@ -256,7 +257,7 @@ namespace FliclibDotNetClient
         }
 
         /// <summary>
-        /// Requests the UUID for a button.
+        /// Requests info for a button.
         /// A null UUID will be sent to the callback if the button was not verified before.
         /// </summary>
         /// <param name="bdAddr">Bluetooth device address</param>
@@ -632,7 +633,7 @@ namespace FliclibDotNetClient
                         ButtonScanner scanner;
                         if (_scanners.TryGetValue(pkt.ScanId, out scanner))
                         {
-                            scanner.OnAdvertisementPacket(new AdvertisementPacketEventArgs { BdAddr = pkt.BdAddr, Name = pkt.Name, Rssi = pkt.Rssi, IsPrivate = pkt.IsPrivate, AlreadyVerified = pkt.AlreadyVerified });
+                            scanner.OnAdvertisementPacket(new AdvertisementPacketEventArgs { BdAddr = pkt.BdAddr, Name = pkt.Name, Rssi = pkt.Rssi, IsPrivate = pkt.IsPrivate, AlreadyVerified = pkt.AlreadyVerified, AlreadyConnectedToThisDevice = pkt.AlreadyConnectedToThisDevice, AlreadyConnectedToOtherDevice = pkt.AlreadyConnectedToOtherDevice });
                         }
                     }
                     break;
@@ -737,7 +738,7 @@ namespace FliclibDotNetClient
                         {
                             callback = _getButtonInfoResponseCallbackQueue.Dequeue();
                         }
-                        callback(pkt.BdAddr, pkt.Uuid, pkt.Color);
+                        callback(pkt.BdAddr, pkt.Uuid, pkt.Color, pkt.SerialNumber);
                     }
                     break;
                 case EventPacket.EVT_SCAN_WIZARD_FOUND_PRIVATE_BUTTON_OPCODE:

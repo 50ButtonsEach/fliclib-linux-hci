@@ -34,6 +34,6 @@ wizard.on_button_connected = on_button_connected
 wizard.on_completed = on_completed
 client.add_scan_wizard(wizard)
 
-print("Welcome to Scan Wizard. Please press your Flic button.")
+print("Welcome to Scan Wizard. Please press and hold down your Flic button until it connects.")
 
 client.handle_events()

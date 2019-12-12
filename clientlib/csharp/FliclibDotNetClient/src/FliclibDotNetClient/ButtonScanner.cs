@@ -35,6 +35,16 @@ namespace FliclibDotNetClient
         /// This button is already verified at the server
         /// </summary>
         public bool AlreadyVerified { get; internal set; }
+
+        /// <summary>
+        /// This button is already connected to this device
+        /// </summary>
+        public bool AlreadyConnectedToThisDevice { get; internal set; }
+
+        /// <summary>
+        /// This button is already connected to another device
+        /// </summary>
+        public bool AlreadyConnectedToOtherDevice { get; internal set; }
     }
 
     /// <summary>

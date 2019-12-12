@@ -151,7 +151,7 @@ namespace FlicLibTest
         {
             if (_currentScanWizard == null)
             {
-                lblScanWizardStatus.Text = "Press your Flic button";
+                lblScanWizardStatus.Text = "Press and hold down your Flic button until it connects";
 
                 var scanWizard = new ScanWizard();
                 scanWizard.FoundPrivateButton += (o, args) => Invoke((MethodInvoker)delegate

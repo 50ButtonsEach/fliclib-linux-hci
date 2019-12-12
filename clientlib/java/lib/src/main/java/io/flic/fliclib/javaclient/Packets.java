@@ -220,6 +220,8 @@ class EvtAdvertisementPacket extends EventPacket {
     public int rssi;
     public boolean isPrivate;
     public boolean alreadyVerified;
+    public boolean alreadyConnectedToThisDevice;
+    public boolean alreadyConnectedToOtherDevice;
 
     @Override
     protected void parseInternal(InputStream stream) throws IOException {
@@ -229,6 +231,8 @@ class EvtAdvertisementPacket extends EventPacket {
         rssi = StreamUtils.getInt8(stream);
         isPrivate = StreamUtils.getBoolean(stream);
         alreadyVerified = StreamUtils.getBoolean(stream);
+        alreadyConnectedToThisDevice = StreamUtils.getBoolean(stream);
+        alreadyConnectedToOtherDevice = StreamUtils.getBoolean(stream);
     }
 }
 
@@ -351,6 +355,7 @@ class EvtGetButtonInfoResponse extends EventPacket {
     public Bdaddr bdaddr;
     public String uuid;
     public String color;
+    public String serialNumber;
 
     @Override
     protected void parseInternal(InputStream stream) throws IOException {
@@ -367,6 +372,10 @@ class EvtGetButtonInfoResponse extends EventPacket {
         color = StreamUtils.getString(stream, 16);
         if (color.isEmpty()) {
             color = null;
+        }
+        serialNumber = StreamUtils.getString(stream, 16);
+        if (serialNumber.isEmpty()) {
+            serialNumber = null;
         }
     }
 }

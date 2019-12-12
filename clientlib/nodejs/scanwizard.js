@@ -11,7 +11,7 @@ var FlicScanner = fliclib.FlicScanner;
 var client = new FlicClient("localhost", 5551);
 
 function startScanWizard() {
-	console.log("Welcome to the add new button wizard. Press your Flic button to add it.");
+	console.log("Welcome to the add new button wizard. Press and hold down your Flic button to add it.");
 	
 	var timeout = null;
 	
@@ -32,7 +32,7 @@ function startScanWizard() {
 	}
 	var cc = null;
 	var scanner = new FlicScanner();
-	scanner.on("advertisementPacket", function(bdAddr, name, rssi, isPrivate, alreadyVerified) {
+	scanner.on("advertisementPacket", function(bdAddr, name, rssi, isPrivate, alreadyVerified, alreadyConnectedToThisDevice, alreadyConnectedToOtherDevice) {
 		if (alreadyVerified) {
 			return;
 		}

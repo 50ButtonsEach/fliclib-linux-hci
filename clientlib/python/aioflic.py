@@ -46,8 +46,8 @@ class RemovedReason(Enum):
     
     DeletedByThisClient = 8
     DeletedByOtherClient = 9
-    
     ButtonBelongsToOtherPartner = 10
+    DeletedFromButton = 11
 
 class ClickType(Enum):
     ButtonDown = 0
@@ -80,13 +80,14 @@ class ScanWizardResult(Enum):
     WizardInternetBackendError = 5
     WizardInvalidData = 6
     WizardButtonBelongsToOtherPartner = 7
+    WizardButtonAlreadyConnectedToOtherDevice = 8
 
 class ButtonScanner:
     """ButtonScanner class.
     
     Usage:
     scanner = ButtonScanner()
-    scanner.on_advertisement_packet = lambda scanner, bd_addr, name, rssi, is_private, already_verified: ...
+    scanner.on_advertisement_packet = lambda scanner, bd_addr, name, rssi, is_private, already_verified, already_connected_to_this_device, already_connected_to_other_device: ...
     client.add_scanner(scanner)
     """
     
@@ -94,7 +95,7 @@ class ButtonScanner:
     
     def __init__(self):
         self._scan_id = next(ButtonScanner._cnt)
-        self.on_advertisement_packet = lambda scanner, bd_addr, name, rssi, is_private, already_verified: None
+        self.on_advertisement_packet = lambda scanner, bd_addr, name, rssi, is_private, already_verified, already_connected_to_this_device, already_connected_to_other_device: None
 
 class ScanWizard:
     """ScanWizard class
@@ -229,7 +230,7 @@ class FlicClient(asyncio.Protocol):
     """
     
     _EVENTS = [
-        ("EvtAdvertisementPacket", "<I6s17pb??", "scan_id bd_addr name rssi is_private already_verified"),
+        ("EvtAdvertisementPacket", "<I6s17pb????", "scan_id bd_addr name rssi is_private already_verified already_connected_to_this_device already_connected_to_other_device"),
         ("EvtCreateConnectionChannelResponse", "<IBB", "conn_id error connection_status"),
         ("EvtConnectionStatusChanged", "<IBB", "conn_id connection_status disconnect_reason"),
         ("EvtConnectionChannelRemoved", "<IB", "conn_id removed_reason"),
@@ -243,7 +244,7 @@ class FlicClient(asyncio.Protocol):
         ("EvtGotSpaceForNewConnection", "<B", "max_concurrently_connected_buttons"),
         ("EvtBluetoothControllerStateChange", "<B", "state"),
         ("EvtPingResponse", "<I", "ping_id"),
-        ("EvtGetButtonInfoResponse", "<6s16s17p", "bd_addr uuid color"),
+        ("EvtGetButtonInfoResponse", "<6s16s17p17p", "bd_addr uuid color serial_number"),
         ("EvtScanWizardFoundPrivateButton", "<I", "scan_wizard_id"),
         ("EvtScanWizardFoundPublicButton", "<I6s17p", "scan_wizard_id bd_addr name"),
         ("EvtScanWizardButtonConnected", "<I", "scan_wizard_id"),
@@ -291,6 +292,8 @@ class FlicClient(asyncio.Protocol):
         self._scan_wizards = {}
         self._connection_channels = {}
         self._battery_status_listeners = {}
+        self._get_info_response_queue = queue.Queue()
+        self._get_button_info_queue = queue.Queue()
         self._closed = False
         
         self.on_new_verified_button = lambda bd_addr: None
@@ -298,7 +301,6 @@ class FlicClient(asyncio.Protocol):
         self.on_got_space_for_new_connection = lambda max_concurrently_connected_buttons: None
         self.on_bluetooth_controller_state_change = lambda state: None    
         self.on_get_info = lambda items: None
-        self.on_get_button_uuid = lambda addr, uuid: None
         self.on_button_deleted = lambda bd_addr, deleted_by_this_client: None
          
     def connection_made(self, transport):
@@ -423,17 +425,18 @@ class FlicClient(asyncio.Protocol):
         """
         self._send_command("CmdGetInfo", {})
     
-    def get_button_uuid(self, bd_addr):
-        """Get button uuid for a verified button.
+    def get_button_info(self, bd_addr, callback):
+        """Get button info for a verified button.
         
         The server will send back its information directly and the callback will be called once the response arrives.
         Responses will arrive in the same order as requested.
         
-        The callback takes two parameters: bd_addr, uuid (hex string of 32 characters).
+        The callback takes four parameters: bd_addr, uuid (hex string of 32 characters), color (string and None if unknown), serial_number.
         
         Note: if the button isn't verified, the uuid sent to the callback will rather be None.
         """
-        self._send_command("CmdGetButtonUUID", {"bd_addr": bd_addr})
+        self._get_button_info_queue.put(callback)
+        self._send_command("CmdGetButtonInfo", {"bd_addr": bd_addr})
     
     
     def run_on_handle_events_thread(self, callback):
@@ -508,10 +511,16 @@ class FlicClient(asyncio.Protocol):
         if event_name == "EvtBluetoothControllerStateChange":
             items["state"] = BluetoothControllerState(items["state"])
         
-        if event_name == "EvtGetButtonUUIDResponse":
+        if event_name == "EvtGetButtonInfoResponse":
             items["uuid"] = "".join(map(lambda x: "%02x" % x, items["uuid"]))
             if items["uuid"] == "00000000000000000000000000000000":
                 items["uuid"] = None
+            items["color"] = items["color"].decode("utf-8")
+            if items["color"] == "":
+                items["color"] = None
+            items["serial_number"] = items["serial_number"].decode("utf-8")
+            if items["serial_number"] == "":
+                items["serial_number"] = None
         
         if event_name == "EvtScanWizardCompleted":
             items["result"] = ScanWizardResult(items["result"])
@@ -565,8 +574,8 @@ class FlicClient(asyncio.Protocol):
         if event_name == "EvtBluetoothControllerStateChange":
             self.on_bluetooth_controller_state_change(items["state"])
         
-        if event_name == "EvtGetButtonUUIDResponse":
-            self.on_get_button_uuid(items["bd_addr"], items["uuid"])
+        if event_name == "EvtGetButtonInfoResponse":
+            self._get_button_info_queue.get()(items["bd_addr"], items["uuid"], items["color"], items["serial_number"])
         
         if event_name == "EvtScanWizardFoundPrivateButton":
             scan_wizard = self._scan_wizards[items["scan_wizard_id"]]
