@@ -486,11 +486,13 @@ int main(int argc, char* argv[]) {
 				}
 				case EVT_GET_BUTTON_INFO_RESPONSE_OPCODE: {
 					EvtGetButtonInfoResponse* evt = (EvtGetButtonInfoResponse*)pkt;
-					printf("Button info response: %s %s %s %s\n",
+					printf("Button info response: %s %s %s %s %d %d\n",
 					       Bdaddr(evt->bd_addr).to_string().c_str(),
 					       bytes_to_hex_string(evt->uuid, sizeof(evt->uuid)).c_str(),
 					       string(evt->color, (size_t)evt->color_length).c_str(),
-					       string(evt->serial_number, (size_t)evt->serial_number_length).c_str()
+					       string(evt->serial_number, (size_t)evt->serial_number_length).c_str(),
+					       evt->flic_version,
+					       evt->firmware_version
 					);
 					break;
 				}

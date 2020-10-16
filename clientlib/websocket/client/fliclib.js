@@ -333,7 +333,9 @@ var FlicRawWebsocketClient = function(wsAddress) {
 					bdAddr: readBdAddr(),
 					uuid: readUuid(),
 					color: readString() || null,
-					serialNumber: readString() || null
+					serialNumber: readString() || null,
+					flicVersion: readUInt8() || null,
+					firmwareVersion: readUInt32() || null
 				};
 				me.onEvent(opcode, evt);
 				break;
@@ -785,7 +787,7 @@ var FlicClient = function(wsAddress) {
 			}
 			case FlicEventOpcodes.GetButtonInfoResponse: {
 				var callback = getButtonInfoCallbackQueue.shift();
-				callback(event.bdAddr, event.uuid, event.color, event.serialNumber);
+				callback(event.bdAddr, event.uuid, event.color, event.serialNumber, event.flicVersion, event.firmwareVersion);
 				break;
 			}
 			case FlicEventOpcodes.ScanWizardFoundPrivateButton:

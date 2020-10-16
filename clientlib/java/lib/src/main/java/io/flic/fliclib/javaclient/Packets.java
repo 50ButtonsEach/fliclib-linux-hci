@@ -356,6 +356,8 @@ class EvtGetButtonInfoResponse extends EventPacket {
     public String uuid;
     public String color;
     public String serialNumber;
+    public int flicVersion;
+    public int firmwareVersion;
 
     @Override
     protected void parseInternal(InputStream stream) throws IOException {
@@ -377,6 +379,8 @@ class EvtGetButtonInfoResponse extends EventPacket {
         if (serialNumber.isEmpty()) {
             serialNumber = null;
         }
+        flicVersion = StreamUtils.getUInt8(stream);
+        firmwareVersion = StreamUtils.getInt32(stream);
     }
 }
 

@@ -94,6 +94,8 @@ Usage: ./flicd -f sqlite_db_file.db [options]
 -l  --log-file      Specify a log file name instead of using stderr.
 
 -w  --wait-for-hci  When starting flicd, wait for hci endpoint to become available instead of exiting with failure status.
+
+-n  --no-fw-updates Disable firmware updates. Not recommended.
 ```
 
 ## Troubleshooting

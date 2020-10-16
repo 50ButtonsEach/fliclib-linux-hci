@@ -30,10 +30,12 @@ namespace FliclibDotNetClient
     /// Callback for GetButtonInfo
     /// </summary>
     /// <param name="bdAddr">The Bluetooth device address for the request</param>
-    /// <param name="uuid">The UUID of the button. Will be null if the button was not verified bufore.</param>
-    /// <param name="color">The color of the button. Will be null if unknown or the button was not verified bufore.</param>
-    /// <param name="serialNumber">The serial number of the button. Will be null if the button was not verified bufore.</param>
-    public delegate void GetButtonInfoResponseCallback(Bdaddr bdAddr, string uuid, string color, string serialNumber);
+    /// <param name="uuid">The UUID of the button. Will be null if the button was not verified before.</param>
+    /// <param name="color">The color of the button. Will be null if unknown or the button was not verified before.</param>
+    /// <param name="serialNumber">The serial number of the button. Will be null if the button was not verified before.</param>
+    /// <param name="flicVersion">The Flic version (1 or 2). Will be 0 if the button was not verified before.</param>
+    /// <param name="firmwareVersion">The firmware version of the button. Will be 0 if the button was not verified before.</param>
+    public delegate void GetButtonInfoResponseCallback(Bdaddr bdAddr, string uuid, string color, string serialNumber, int flicVersion, int firmwareVersion);
 
     /// <summary>
     /// NewVerifiedButtonEventArgs
@@ -738,7 +740,7 @@ namespace FliclibDotNetClient
                         {
                             callback = _getButtonInfoResponseCallbackQueue.Dequeue();
                         }
-                        callback(pkt.BdAddr, pkt.Uuid, pkt.Color, pkt.SerialNumber);
+                        callback(pkt.BdAddr, pkt.Uuid, pkt.Color, pkt.SerialNumber, pkt.FlicVersion, pkt.FirmwareVersion);
                     }
                     break;
                 case EventPacket.EVT_SCAN_WIZARD_FOUND_PRIVATE_BUTTON_OPCODE:

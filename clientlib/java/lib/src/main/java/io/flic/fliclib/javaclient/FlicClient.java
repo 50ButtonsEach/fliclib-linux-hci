@@ -561,7 +561,7 @@ public class FlicClient {
             case EventPacket.EVT_GET_BUTTON_INFO_RESPONSE_OPCODE: {
                 EvtGetButtonInfoResponse pkt = new EvtGetButtonInfoResponse();
                 pkt.parse(packet);
-                getButtonInfoResponseCallbackQueue.remove().onGetButtonInfoResponse(pkt.bdaddr, pkt.uuid, pkt.color, pkt.serialNumber);
+                getButtonInfoResponseCallbackQueue.remove().onGetButtonInfoResponse(pkt.bdaddr, pkt.uuid, pkt.color, pkt.serialNumber, pkt.flicVersion, pkt.firmwareVersion);
                 break;
             }
             case EventPacket.EVT_SCAN_WIZARD_FOUND_PRIVATE_BUTTON_OPCODE: {

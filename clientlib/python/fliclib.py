@@ -251,7 +251,7 @@ class FlicClient:
 		("EvtGotSpaceForNewConnection", "<B", "max_concurrently_connected_buttons"),
 		("EvtBluetoothControllerStateChange", "<B", "state"),
 		("EvtPingResponse", "<I", "ping_id"),
-		("EvtGetButtonInfoResponse", "<6s16s17p17p", "bd_addr uuid color serial_number"),
+		("EvtGetButtonInfoResponse", "<6s16s17p17pBI", "bd_addr uuid color serial_number flic_version firmware_version"),
 		("EvtScanWizardFoundPrivateButton", "<I", "scan_wizard_id"),
 		("EvtScanWizardFoundPublicButton", "<I6s17p", "scan_wizard_id bd_addr name"),
 		("EvtScanWizardButtonConnected", "<I", "scan_wizard_id"),
@@ -448,7 +448,7 @@ class FlicClient:
 		The server will send back its information directly and the callback will be called once the response arrives.
 		Responses will arrive in the same order as requested.
 		
-		The callback takes four parameters: bd_addr, uuid (hex string of 32 characters), color (string and None if unknown), serial_number.
+		The callback takes four parameters: bd_addr, uuid (hex string of 32 characters), color (string and None if unknown), serial_number, flic_version, firmware_version.
 		
 		Note: if the button isn't verified, the uuid sent to the callback will rather be None.
 		"""
@@ -604,7 +604,7 @@ class FlicClient:
 			self.on_bluetooth_controller_state_change(items["state"])
 		
 		if event_name == "EvtGetButtonInfoResponse":
-			self._get_button_info_queue.get()(items["bd_addr"], items["uuid"], items["color"], items["serial_number"])
+			self._get_button_info_queue.get()(items["bd_addr"], items["uuid"], items["color"], items["serial_number"], items["flic_version"], items["firmware_version"])
 		
 		if event_name == "EvtScanWizardFoundPrivateButton":
 			scan_wizard = self._scan_wizards[items["scan_wizard_id"]]

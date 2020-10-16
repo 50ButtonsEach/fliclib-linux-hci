@@ -290,6 +290,8 @@ typedef struct {
 	char color[16];
 	uint8_t serial_number_length;
 	char serial_number[16];
+	uint8_t flic_version;
+	uint32_t firmware_version;
 } PACKED EvtGetButtonInfoResponse;
 
 typedef struct {

@@ -364,6 +364,8 @@ namespace FliclibDotNetClient
         internal string Uuid;
         internal string Color;
         internal string SerialNumber;
+        internal int FlicVersion;
+        internal int FirmwareVersion;
 
         protected override void ParseInternal(BinaryReader reader)
         {
@@ -412,6 +414,8 @@ namespace FliclibDotNetClient
                 reader.ReadByte();
             }
             SerialNumber = serialNumberLen == 0 ? null : Encoding.UTF8.GetString(serialNumberBytes);
+            FlicVersion = reader.ReadByte();
+            FirmwareVersion = reader.ReadUInt32();
         }
     }
 

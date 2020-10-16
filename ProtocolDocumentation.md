@@ -540,6 +540,12 @@ The length in bytes of the serial number following.
 _char[16]_ **serial_number**:
 The serial number of the button, in UTF-8 encoding. Only the first _serial\_number\_length_ bytes are used. The other bytes will be zeros.
 
+_uint8\_t_ **flic_version**:
+Contains 1 for Flic 1 and 2 for Flic 2.
+
+_uint32\_t_ **firmware_version**:
+The current firmware version of the button. For Flic 1, might contain 0 if yet unknown.
+
 ### EvtScanWizardFoundPrivateButton
 Sent once if a previously not verified private button is found during the scan. If this is received, tell the user to hold the button down for 7 seconds.
 

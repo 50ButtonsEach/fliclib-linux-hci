@@ -346,7 +346,9 @@ var FlicRawClient = function(inetAddress, port) {
 					bdAddr: readBdAddr(),
 					uuid: readUuid(),
 					color: readString() || null,
-					serialNumber: readString() || null
+					serialNumber: readString() || null,
+					flicVersion: readUInt8() || null,
+					firmwareVersion: readUInt32() || null
 				};
 				me.onEvent(opcode, evt);
 				break;
@@ -787,7 +789,7 @@ util.inherits(FlicScanWizard, EventEmitter);
  *   currentPendingConnections,
  *   bdAddrOfVerifiedButtons
  * getButtonInfo: bdAddr, callback
- *   Callback parameters: bdAddr, uuid, color, serialNumber
+ *   Callback parameters: bdAddr, uuid, color, serialNumber, flicVersion, serialNumber
  * deleteButton: bdAddr
  * close
  * 
@@ -876,7 +878,7 @@ var FlicClient = function(host, port) {
 			}
 			case FlicEventOpcodes.GetButtonInfoResponse: {
 				var callback = getButtonInfoCallbackQueue.shift();
-				callback(event.bdAddr, event.uuid, event.color, event.serialNumber);
+				callback(event.bdAddr, event.uuid, event.color, event.serialNumber, event.flicVersion, event.firmwareVersion);
 				break;
 			}
 			case FlicEventOpcodes.ScanWizardFoundPrivateButton:
