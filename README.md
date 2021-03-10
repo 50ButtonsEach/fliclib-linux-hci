@@ -1,4 +1,4 @@
-# Flic SDK for Linux Beta
+# Flic SDK for Linux
 With this SDK you can connect to and interact with Flic buttons. PbF, Flic 1 as well as Flic 2 buttons are supported.
 
 ## Previous SDK
