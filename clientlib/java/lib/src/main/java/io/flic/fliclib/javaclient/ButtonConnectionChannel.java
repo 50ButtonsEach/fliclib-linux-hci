@@ -109,7 +109,7 @@ public class ButtonConnectionChannel {
     /**
      * Applies new auto disconnect time parameter.
      *
-     * @param autoDisconnectTime Number of seconds (0 - 511) until disconnect if no button event happens. 512 disables this feature.
+     * @param autoDisconnectTime Number of seconds (0 - 511) until disconnect if no button event happens. 511 disables this feature.
      */
     public void setAutoDisconnectTime(short autoDisconnectTime) throws IOException {
         if (latencyMode == null) {

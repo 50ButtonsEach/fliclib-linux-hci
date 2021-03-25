@@ -233,7 +233,7 @@ extends java.lang.Object</pre>
 <div class="block">Create a connection channel using the specified parameters.
 
  Add this button connection channel to a <a href="../../../../io/flic/fliclib/javaclient/FlicClient.html" title="class in io.flic.fliclib.javaclient"><code>FlicClient</code></a> by executing <a href="../../../../io/flic/fliclib/javaclient/FlicClient.html#addConnectionChannel(io.flic.fliclib.javaclient.ButtonConnectionChannel)"><code>FlicClient.addConnectionChannel(ButtonConnectionChannel)</code></a>.</div>
-<dl><dt><span class="strong">Parameters:</span></dt><dd><code>bdaddr</code> - </dd><dd><code>latencyMode</code> - </dd><dd><code>autoDisconnectTime</code> - Number of seconds (0 - 511) until disconnect if no button event happens. 512 disables this feature.</dd><dd><code>callbacks</code> - </dd></dl>
+<dl><dt><span class="strong">Parameters:</span></dt><dd><code>bdaddr</code> - </dd><dd><code>latencyMode</code> - </dd><dd><code>autoDisconnectTime</code> - Number of seconds (0 - 511) until disconnect if no button event happens. 511 disables this feature.</dd><dd><code>callbacks</code> - </dd></dl>
 </li>
 </ul>
 <a name="ButtonConnectionChannel(io.flic.fliclib.javaclient.Bdaddr, io.flic.fliclib.javaclient.ButtonConnectionChannel.Callbacks)">
@@ -319,7 +319,7 @@ extends java.lang.Object</pre>
 <pre>public&nbsp;void&nbsp;setAutoDisconnectTime(short&nbsp;autoDisconnectTime)
                            throws java.io.IOException</pre>
 <div class="block">Applies new auto disconnect time parameter.</div>
-<dl><dt><span class="strong">Parameters:</span></dt><dd><code>autoDisconnectTime</code> - Number of seconds (0 - 511) until disconnect if no button event happens. 512 disables this feature.</dd>
+<dl><dt><span class="strong">Parameters:</span></dt><dd><code>autoDisconnectTime</code> - Number of seconds (0 - 511) until disconnect if no button event happens. 511 disables this feature.</dd>
 <dt><span class="strong">Throws:</span></dt>
 <dd><code>java.io.IOException</code></dd></dl>
 </li>
