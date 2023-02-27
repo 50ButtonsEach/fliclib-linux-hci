@@ -35,7 +35,7 @@ namespace FliclibDotNetClient
     /// <param name="serialNumber">The serial number of the button. Will be null if the button was not verified before.</param>
     /// <param name="flicVersion">The Flic version (1 or 2). Will be 0 if the button was not verified before.</param>
     /// <param name="firmwareVersion">The firmware version of the button. Will be 0 if the button was not verified before.</param>
-    public delegate void GetButtonInfoResponseCallback(Bdaddr bdAddr, string uuid, string color, string serialNumber, int flicVersion, int firmwareVersion);
+    public delegate void GetButtonInfoResponseCallback(Bdaddr bdAddr, string uuid, string color, string serialNumber, int flicVersion, uint firmwareVersion);
 
     /// <summary>
     /// NewVerifiedButtonEventArgs
